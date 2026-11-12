@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Produtividade Esgoto</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#102840;--blue:#176b9c;--cyan:#16a5b8;--ink:#1f2d3d;--muted:#64748b;--line:#dbe4ec;--bg:#f3f6f9;
+--marinho:#1A2740;--azul:#394D73;--azul-claro:#49668C;--tint:#e7f0f6;--zebra:#f7fafc;--laranja:#E8710A;--laranja-texto:#C2560C;
+--ok-fundo:#dcfce7;--ok-texto:#166534;--atencao-fundo:#ffedd5;--atencao-texto:#9a3412;--agua-fundo:#e0f2fe;--agua-texto:#075985;--esgoto-fundo:#ede9fe;--esgoto-texto:#5b21b6;--card:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif;font-size:14px}
+header{background:linear-gradient(135deg,#0b2447 0%,#14375e 60%,#1b4a76 100%);color:#fff;padding:18px 16px}
+header small{color:#9fe1e7;letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+header h1{margin:4px 0 0;font-size:20px}
+main{padding:16px;max-width:1500px;margin:auto}
+.cfg{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.cfg label{display:block;font-weight:600;color:var(--marinho);margin-bottom:4px;font-size:12px}
+.cfg textarea{width:100%;height:90px;border:1px solid var(--line);border-radius:6px;padding:6px;font:12px 'IBM Plex Sans Condensed',sans-serif}
+.cfg input[type=file]{width:100%}
+button{background:var(--navy);color:#fff;border:0;border-radius:6px;padding:10px 16px;font-weight:600;cursor:pointer}
+button:hover{background:var(--blue)}
+.msg{color:var(--muted);font-size:12px;margin-top:8px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0}
+.panel h2{margin:0 0 10px;color:var(--marinho);font-size:16px;border-bottom:3px solid var(--cyan);padding-bottom:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px}
+.kpi{background:#f8fafc;border-top:3px solid var(--marinho);border-radius:6px;padding:8px}
+.kpi span{display:block;font-size:11px;color:var(--azul-claro)}
+.kpi b{font-size:20px;color:#05050D}
+.tw{overflow-x:auto;max-height:440px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:12.5px}
+th{background:var(--marinho);color:#fff;text-align:left;padding:6px;position:sticky;top:0;white-space:nowrap}
+td{padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:nth-child(even) td{background:var(--zebra)}
+tr.tot td{background:var(--tint);font-weight:700}
+td.n{text-align:right}
+.bar{height:6px;background:#DCE6EE;border-radius:3px;min-width:60px}.bar i{display:block;height:100%;background:var(--cyan);border-radius:3px}
+.low{color:var(--laranja-texto);font-weight:600}
+.tag{padding:1px 6px;border-radius:10px;font-size:11px}
+.tag.ind{background:var(--esgoto-fundo);color:var(--esgoto-texto)}.tag.pad{background:var(--agua-fundo);color:var(--agua-texto)}
+h3{font-size:13px;color:var(--azul);margin:8px 0}
+.full{margin-top:16px}
+</style>
+</head>
+<body>
+<header><small>Águas do Rio · Relatório Executivo</small><h1>Produtividade · Execução de Esgoto</h1></header>
+<main>
+<section class="cfg">
+  <div><label>1. Planilha de OS executadas (.xlsx/.csv)</label><input type="file" id="fOS" accept=".xlsx,.xls,.csv"></div>
+  <div><label>2. Base de matrículas / logradouros (.xlsx/.csv)</label><input type="file" id="fBase" accept=".xlsx,.xls,.csv"></div>
+  <div><label>Recursos da ENGENHARIA (um por linha)</label><textarea id="rEng" placeholder="Cole aqui os recursos da engenharia"></textarea></div>
+  <div><label>Recursos de SERVIÇOS (um por linha)</label><textarea id="rSrv" placeholder="Cole aqui os recursos de serviços"></textarea></div>
+  <div><button id="go">Gerar relatório</button><div class="msg" id="msg">Recursos não listados em nenhuma das caixas aparecem como "Não classificado".</div></div>
+</section>
+<div class="cols" id="cols"></div>
+<div class="panel full" id="ruas" hidden></div>
+</main>
+<script>
+/* ======== CONFIGURAÇÃO (ajuste aqui se os nomes mudarem) ======== */
+const CFG = {
+  os: {
+    recurso:'Recurso', matricula:'Matrícula', codigo:'Código/Descrição', status:'Status da Atividade',
+    data:'Data', adicionais:'Serviço adicionais resposta', endereco:'Endereço'
+  },
+  codigoAlvo:'SONDAGEM DE REDE DE ESGOTO',                 // filtra só esta OS
+  implantacao:'IMPLANTAÇÃO DE LIGAÇÃO DE ESGOTO',           // presença em "Serviço adicionais resposta" = ligação implantada
+  statusExec:['FINALIZADA','ENCERRADA COM OCORRENCIA'],     // conta como executada (produtividade)
+  base: { matricula:'NUM_LIGACAO', logradouro:'NOM_LOGRADOURO', bairro:'NOM_BAIRRO', faturamento:'TIPO_FATURAMENTO', engenharia:'Engenharia execução' },
+  // TIPO_FATURAMENTO: se contém ESGOTO -> padronização; se só ÁGUA -> faturamento indireto novo de esgoto
+  metaProd:0.7   // abaixo disso a produtividade fica em laranja
+};
+/* ================================================================ */
+const norm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toUpperCase().replace(/\s+/g,' ');
+const keyMat=s=>String(s??'').replace(/\D/g,'').replace(/^0+/,'');
+const fmt=n=>n.toLocaleString('pt-BR');
+const pct=n=>isFinite(n)?(n*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'–';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function readFile(input){return new Promise((ok,err)=>{const f=input.files[0];if(!f)return err('Selecione os dois arquivos.');
+  const csv=/\.csv$/i.test(f.name);const r=new FileReader();r.onload=e=>{const wb=XLSX.read(e.target.result,{type:csv?'string':'array',cellDates:true});
+  ok(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}))};csv?r.readAsText(f,'utf-8'):r.readAsArrayBuffer(f)})}
+function col(rows,name){ // acha a coluna ignorando acento/maiúscula
+  if(!rows.length)return name;const t=norm(name);return Object.keys(rows[0]).find(k=>norm(k)===t)||name}
+const tipoFat=v=>{const t=norm(v);if(!t)return 'Sem info';return t.includes('ESGOTO')?'Padronização':'Fat. indireto esgoto'};
+const engFeita=v=>{const t=norm(v);return t!==''&&!['NAO','N','0','NAO EXECUTADO','PENDENTE'].includes(t)};
+
+document.getElementById('go').onclick=async()=>{
+  const msg=document.getElementById('msg');
+  try{
+    msg.textContent='Lendo arquivos…';
+    const [os,base]=await Promise.all([readFile(fOS),readFile(fBase)]);
+    const C={};for(const k in CFG.os)C[k]=col(os,CFG.os[k]);
+    const B={};for(const k in CFG.base)B[k]=col(base,CFG.base[k]);
+    const eng=new Set(rEng.value.split(/\n/).map(norm).filter(Boolean));
+    const srv=new Set(rSrv.value.split(/\n/).map(norm).filter(Boolean));
+    const exec=new Set(CFG.statusExec.map(norm));
+    const alvo=norm(CFG.codigoAlvo),impl=norm(CFG.implantacao);
+
+    // base por matrícula
+    const baseMap=new Map();
+    for(const r of base)baseMap.set(keyMat(r[B.matricula]),{rua:String(r[B.logradouro]||'SEM LOGRADOURO').trim(),bairro:r[B.bairro],fat:tipoFat(r[B.faturamento]),eng:engFeita(r[B.engenharia])});
+
+    const grupos={'Engenharia':[],'Serviços':[],'Não classificado':[]};
+    let semBase=0;
+    for(const r of os){
+      if(!norm(r[C.codigo]).includes(alvo))continue;
+      const rec=norm(r[C.recurso]);
+      const g=eng.has(rec)?'Engenharia':srv.has(rec)?'Serviços':'Não classificado';
+      const b=baseMap.get(keyMat(r[C.matricula]));if(!b)semBase++;
+      grupos[g].push({rec:String(r[C.recurso]).trim(),mat:keyMat(r[C.matricula]),exec:exec.has(norm(r[C.status])),
+        impl:norm(r[C.adicionais]).includes(impl),b});
+    }
+    const cols=document.getElementById('cols');cols.innerHTML='';
+    for(const g of ['Engenharia','Serviços','Não classificado']){
+      if(g==='Não classificado'&&!grupos[g].length)continue;cols.insertAdjacentHTML('beforeend',painel(g,grupos[g]));
+    }
+    ruas(baseMap,grupos);
+    msg.textContent=`${fmt(os.length)} linhas de OS · ${fmt(base.length)} matrículas na base · ${fmt(semBase)} OS sem matrícula na base.`;
+  }catch(e){msg.textContent='Erro: '+e;console.error(e)}
+};
+
+function painel(nome,L){
+  const vis=L.length,ex=L.filter(x=>x.exec).length,im=L.filter(x=>x.exec&&x.impl).length;
+  const por=new Map();
+  for(const x of L){const o=por.get(x.rec)||{v:0,e:0,i:0,ind:0,pad:0};o.v++;if(x.exec)o.e++;
+    if(x.exec&&x.impl){o.i++;if(x.b?.fat==='Fat. indireto esgoto')o.ind++;else if(x.b?.fat==='Padronização')o.pad++}por.set(x.rec,o)}
+  const ind=L.filter(x=>x.exec&&x.impl&&x.b?.fat==='Fat. indireto esgoto').length;
+  const pad=L.filter(x=>x.exec&&x.impl&&x.b?.fat==='Padronização').length;
+  const linhas=[...por].sort((a,b)=>b[1].e-a[1].e).map(([r,o])=>{const p=o.e/o.v;
+    return `<tr><td>${esc(r)}</td><td class=n>${o.v}</td><td class=n>${o.e}</td><td class="n ${p<CFG.metaProd?'low':''}">${pct(p)}</td><td><div class=bar><i style="width:${Math.min(100,p*100)}%"></i></div></td><td class=n>${o.i}</td><td class=n>${o.ind}</td><td class=n>${o.pad}</td></tr>`}).join('');
+  return `<div class=panel><h2>${nome}</h2><div class=kpis>
+   <div class=kpi><span>Equipes ativas</span><b>${por.size}</b></div>
+   <div class=kpi><span>Visitas</span><b>${fmt(vis)}</b></div>
+   <div class=kpi><span>Executadas</span><b>${fmt(ex)}</b></div>
+   <div class=kpi><span>Produtividade</span><b class="${ex/vis<CFG.metaProd?'low':''}">${pct(ex/vis)}</b></div>
+   <div class=kpi><span>Prod./equipe</span><b>${por.size?(ex/por.size).toLocaleString('pt-BR',{maximumFractionDigits:1}):'–'}</b></div>
+   <div class=kpi><span>Ligações implantadas</span><b>${fmt(im)}</b></div>
+   <div class=kpi><span><span class="tag ind">Fat. indireto</span></span><b>${fmt(ind)}</b></div>
+   <div class=kpi><span><span class="tag pad">Padronização</span></span><b>${fmt(pad)}</b></div></div>
+   <div class=tw><table><tr><th>Recurso</th><th>Visitas</th><th>Exec.</th><th>Prod.</th><th></th><th>Implant.</th><th>Fat. ind.</th><th>Padron.</th></tr>${linhas}
+   <tr class=tot><td>Total</td><td class=n>${vis}</td><td class=n>${ex}</td><td class=n>${pct(ex/vis)}</td><td></td><td class=n>${im}</td><td class=n>${ind}</td><td class=n>${pad}</td></tr></table></div></div>`;
+}
+
+function ruas(baseMap,grupos){
+  const R=new Map();const get=k=>{let o=R.get(k);if(!o){o={b:'',tot:0,ind:0,pad:0,engBase:0,eng:new Set(),srv:new Set()};R.set(k,o)}return o};
+  for(const b of baseMap.values()){const o=get(b.rua);o.b=b.bairro||o.b;o.tot++;if(b.fat==='Fat. indireto esgoto')o.ind++;if(b.fat==='Padronização')o.pad++;if(b.eng)o.engBase++}
+  for(const [g,L] of Object.entries(grupos))for(const x of L)if(x.b&&x.exec&&x.impl){const o=get(x.b.rua);(g==='Engenharia'?o.eng:o.srv).add(x.mat)}
+  const rows=[...R].map(([rua,o])=>{const feitas=Math.max(o.engBase,o.eng.size)+o.srv.size;return{rua,...o,feitas,falta:Math.max(0,o.tot-feitas)}}).sort((a,b)=>b.falta-a.falta);
+  const t=rows.reduce((s,r)=>{s.tot+=r.tot;s.f+=r.feitas;s.fa+=r.falta;return s},{tot:0,f:0,fa:0});
+  const el=document.getElementById('ruas');el.hidden=false;
+  el.innerHTML=`<h2>Execução por logradouro (matrícula × base)</h2>
+   <input id=fRua placeholder="Filtrar rua…" style="padding:6px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;width:100%;max-width:320px">
+   <div class=tw style="max-height:560px"><table id=tR><tr><th>Logradouro</th><th>Bairro</th><th>Ligações base</th><th>Fat. indireto (só água)</th><th>Padronização (água+esgoto)</th><th>Engenharia (base)</th><th>Engenharia (OS)</th><th>Serviços (OS)</th><th>Feitas</th><th>Faltam</th><th>% concluído</th></tr>
+   ${rows.map(r=>`<tr><td>${esc(r.rua)}</td><td>${esc(r.b||'')}</td><td class=n>${r.tot}</td><td class=n>${r.ind}</td><td class=n>${r.pad}</td><td class=n>${r.engBase}</td><td class=n>${r.eng.size}</td><td class=n>${r.srv.size}</td><td class=n>${r.feitas}</td><td class="n ${r.falta?'low':''}">${r.falta}</td><td><div class=bar><i style="width:${r.tot?Math.min(100,r.feitas/r.tot*100):0}%"></i></div></td></tr>`).join('')}
+   <tr class=tot><td>Total</td><td></td><td class=n>${fmt(t.tot)}</td><td></td><td></td><td></td><td></td><td></td><td class=n>${fmt(t.f)}</td><td class=n>${fmt(t.fa)}</td><td>${pct(t.f/t.tot)}</td></tr></table></div>`;
+  document.getElementById('fRua').oninput=e=>{const q=norm(e.target.value);for(const tr of document.querySelectorAll('#tR tr:not(:first-child):not(.tot)'))tr.hidden=!norm(tr.cells[0].textContent).includes(q)};
+}
+</script>
+</body>
+</html>
