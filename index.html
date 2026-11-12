@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v7</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v8</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v7-20261112";
+const VERSAO_SITE = "v8-20261112";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -388,7 +388,7 @@ function porGrupo(L) {
   }
   return G;
 }
-const resumo = (L) => { const ex = L.filter((r) => r.e), im = ex.filter((r) => r.i); return { vis: L.length, ex: ex.length, im: im.length, ind: im.filter((r) => r.B?.f === "IND").length, pad: im.filter((r) => r.B?.f === "PAD").length, prod: L.length ? ex.length / L.length : 0, exL: ex, imL: im }; };
+const resumo = (L) => { const ex = L.filter((r) => r.e), im = ex.filter((r) => r.i); const dias = new Set(L.map((r) => r.d).filter(Boolean)).size, eqDias = new Set(L.filter((r) => r.d).map((r) => r.r + "|" + r.d)).size; return { dias, eqDias, vis: L.length, ex: ex.length, im: im.length, ind: im.filter((r) => r.B?.f === "IND").length, pad: im.filter((r) => r.B?.f === "PAD").length, prod: L.length ? ex.length / L.length : 0, exL: ex, imL: im }; };
 function situacaoRuas() {
   // matrícula feita = engenharia marcada na base OU OS executada com implantação (todo o período)
   const feito = new Map();
@@ -418,7 +418,7 @@ function abaProd() {
   const L = osFiltradas(), G = porGrupo(L), meta = RG().meta;
   const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo);
   const eq = (g) => G[g] ? [...G[g].rec.values()].length : 0;
-  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Produtividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
+  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Produtividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
   const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
   h += `<div class="duas">${cards.join("")}</div>`;
   h += cardGrafMes(L);
@@ -426,13 +426,13 @@ function abaProd() {
 }
 function cardGrupo(g, o) {
   const meta = RG().meta;
-  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
   const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex);
   const T = resumo(o.L);
-  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}</tr>`;
-  return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Produtividade", pct(T.prod), "", T.prod < meta)}${kpi("Exec./equipe", num(T.ex / recs.length))}</div>
-  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
+  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}</tr>`;
+  return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Produtividade", pct(T.prod), "", T.prod < meta)}${kpi("Exec./equipe", num(T.ex / recs.length))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}</div>
+  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n">Prod.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
 }
 function barras(meses, series, alt = 220) {
   const W = Math.max(520, meses.length * 70), H = alt, pad = { l: 36, b: 28, t: 18, r: 8 };
@@ -521,10 +521,10 @@ function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
   const fim = D.os.map((r) => r.d).filter(Boolean).sort().pop(); const dI = new Date(fim + "T00:00:00"); dI.setDate(dI.getDate() - 6); const ini = dI.toISOString().slice(0, 10);
   const L = D.os.filter((r) => r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
-  const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
+  const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.eqDias)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
   const ruas = situacaoRuas().filter((r) => r.falta.length).slice(0, 5);
   return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
-  <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implantação</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
+  <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Equipe-dia</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implantação</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
   ${ruas.length ? `<h4 style="margin:12px 0 4px;color:#394D73">Ruas com mais ligações faltando</h4><table><thead><tr><th>Logradouro</th><th class="n">Ligações</th><th class="n">Feitas</th><th class="n">Faltam</th></tr></thead><tbody>${ruas.map((r) => `<tr><td>${esc(r.rua)}</td><td class="n">${num(r.tot)}</td><td class="n">${num(r.feitas)}</td><td class="n low">${num(r.falta.length)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`;
 }
 function abaDados() {
@@ -564,6 +564,7 @@ function abaDados() {
     <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
     <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
+    <li><b>Dias trabalhados</b> = dias diferentes (coluna Data) com pelo menos uma OS. Por equipe: dias daquela equipe. No total: soma dos dias de cada equipe (equipe-dia). <b>Exec./dia</b> = executadas ÷ dias trabalhados.</li>
     <li><b>Implantação</b> = toda OS executada (ou só as que têm o texto da regra 4, se preenchido).</li>
     <li>OS repetidas (mesmo ID da Atividade em mais de um arquivo) contam uma vez só.</li></ul></div></details>
   <details><summary>Como foi calculado · Logradouros</summary><div><ul class="av">
