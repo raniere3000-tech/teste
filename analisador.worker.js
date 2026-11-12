@@ -1,5 +1,5 @@
 /* Web Worker: lê as planilhas com Python (Pyodide) e devolve JSON para a página. */
-const VERSAO = "v2-20261112";
+const VERSAO = "v3-20261112";
 const PYODIDE_VERSAO = "0.29.5";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSAO}/full/`;
 const ARQUIVOS_PY = ["pacote/__init__.py", "pacote/leitura.py", "pacote/regras.json"];
@@ -12,7 +12,9 @@ async function prepara() {
   await py.loadPackage(["pandas", "micropip", "xlrd"]);
   await py.pyimport("micropip").install("openpyxl");
   for (const caminho of ARQUIVOS_PY) {
-    const txt = await (await fetch(caminho + "?v=" + VERSAO)).text();
+    const resp = await fetch(caminho + "?v=" + VERSAO);
+    if (!resp.ok) throw new Error(`Arquivo do painel não encontrado no site: ${caminho} (HTTP ${resp.status})`);
+    const txt = await resp.text();
     py.FS.mkdirTree(caminho.split("/").slice(0, -1).join("/") || ".");
     py.FS.writeFile(caminho, txt);
   }
