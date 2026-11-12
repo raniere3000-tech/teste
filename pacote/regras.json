@@ -31,10 +31,10 @@
     },
     "codigo_alvo": "SONDAGEM DE REDE DE ESGOTO",
     "status_executada": [
-      "FINALIZADA",
-      "ENCERRADA COM OCORRENCIA"
+      "Finalizada",
+      "Encerrada com Ocorrência"
     ],
-    "implantacao": "IMPLANTACAO DE LIGACAO DE ESGOTO"
+    "implantacao": "IMPLANTAÇÃO DE LIGAÇÃO DE ESGOTO"
   },
   "base": {
     "rotulo": "Base de ligações por logradouro",
