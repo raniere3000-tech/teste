@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v3</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v4</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v3-20261112";
+const VERSAO_SITE = "v4-20261112";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -436,10 +436,24 @@ function abaRuas() {
   h += `<div class="card"><div class="card-h"><h2>Execução por logradouro</h2>${help("Cruza a Matrícula das OS com o NUM_LIGACAO da base. Feita = coluna Engenharia execução preenchida na base, ou OS executada com implantação de ligação (todo o período, sem o filtro de mês). Fat. indireto = TIPO_FATURAMENTO só água (ligação nova gera receita de esgoto). Padronização = já fatura água e esgoto. Clique num número para ver os clientes.")}<div class="dir"><input class="busca" id="bRua" placeholder="Buscar logradouro…" value="${esc(BUSCA_RUA)}"><button class="btn" data-m2="csv-ruas">⬇ CSV</button></div></div>
   <div class="tw" style="max-height:600px"><table id="tRuas"><thead><tr><th>Logradouro</th><th>Bairro</th><th>Cidade</th><th class="n">Ligações</th><th class="n">Fat. ind.</th><th class="n">Padron.</th><th class="n">Eng. (base)</th><th class="n">Eng. (OS)</th><th class="n">Serviços</th><th class="n">Feitas</th><th class="n">Faltam</th><th class="n">Faltam fat. ind.</th><th>% concluído</th></tr></thead><tbody>
   ${R.map((r) => { const p = r.tot ? r.feitas / r.tot : 0; const n = r.rua; return `<tr data-rua="${esc(norm(r.rua))}"><td>${esc(r.rua)}</td><td>${esc(r.bairro)}</td><td>${esc(r.cid)}</td>${lk(r.tot, n + " · ligações", () => r.L.map((b) => linhaBase(b, b.sit)))}${lk(r.ind, n + " · fat. indireto", () => r.L.filter((b) => b.f === "IND").map((b) => linhaBase(b, b.sit)))}${lk(r.pad, n + " · padronização", () => r.L.filter((b) => b.f === "PAD").map((b) => linhaBase(b, b.sit)))}${lk(r.engB.length, n + " · engenharia (base)", () => r.engB.map((b) => linhaBase(b, "Engenharia (base)")))}${lk(r.engO.length, n + " · engenharia (OS)", () => r.engO.map((b) => linhaBase(b, "Engenharia (OS)")))}${lk(r.srv.length, n + " · serviços", () => r.srv.map((b) => linhaBase(b, "Serviços (OS)")))}${lk(r.feitas, n + " · feitas", () => [...r.engB, ...r.engO, ...r.srv].map((b) => linhaBase(b, "Feita")))}${r.falta.length ? lk(r.falta.length, n + " · faltam", () => r.falta.map((b) => linhaBase(b, "Falta"))).replace('class="n lk"', 'class="n lk low"') : `<td class="n ok">-</td>`}${lk(r.faltaInd, n + " · faltam (fat. indireto)", () => r.falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")))}<td><div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div> ${pct(p)}</td></tr>`; }).join("")}
-  </tbody><tfoot><tr class="tot"><td>Total</td><td></td><td></td><td class="n">${num(t.tot)}</td><td></td><td></td><td></td><td></td><td></td><td class="n">${num(t.f)}</td><td class="n">${num(t.fa)}</td><td class="n">${num(t.fi)}</td><td>${pct(t.f / t.tot)}</td></tr></tfoot></table></div></div>`;
+  </tbody><tfoot><tr class="tot"><td>Total</td><td></td><td></td>${totRuas(R)}<td>${pct(t.f / t.tot)}</td></tr></tfoot></table></div></div>`;
   const top = R.filter((r) => r.falta.length).slice(0, 15);
   if (top.length) h += `<div class="card"><div class="card-h"><h2>Logradouros com mais ligações faltando</h2>${help("As 15 ruas com mais ligações ainda sem execução. Marinho = feitas, laranja = faltam.")}</div>${barrasH(top)}</div>`;
   return h;
+}
+function totRuas(R) {
+  const all = (fn) => R.flatMap(fn), T = "Todos os logradouros";
+  const sb = (b) => b.sit, ind = all((r) => r.L.filter((b) => b.f === "IND")), pad = all((r) => r.L.filter((b) => b.f === "PAD"));
+  const engB = all((r) => r.engB), engO = all((r) => r.engO), srv = all((r) => r.srv), falta = all((r) => r.falta);
+  return lk(R.reduce((s, r) => s + r.tot, 0), T + " · ligações", () => all((r) => r.L).map((b) => linhaBase(b, sb(b))))
+    + lk(ind.length, T + " · fat. indireto", () => ind.map((b) => linhaBase(b, sb(b))))
+    + lk(pad.length, T + " · padronização", () => pad.map((b) => linhaBase(b, sb(b))))
+    + lk(engB.length, T + " · engenharia (base)", () => engB.map((b) => linhaBase(b, "Engenharia (base)")))
+    + lk(engO.length, T + " · engenharia (OS)", () => engO.map((b) => linhaBase(b, "Engenharia (OS)")))
+    + lk(srv.length, T + " · serviços", () => srv.map((b) => linhaBase(b, "Serviços (OS)")))
+    + lk(engB.length + engO.length + srv.length, T + " · feitas", () => [...engB.map((b) => linhaBase(b, "Engenharia (base)")), ...engO.map((b) => linhaBase(b, "Engenharia (OS)")), ...srv.map((b) => linhaBase(b, "Serviços (OS)"))])
+    + lk(falta.length, T + " · faltam", () => falta.map((b) => linhaBase(b, "Falta")))
+    + lk(falta.filter((b) => b.f === "IND").length, T + " · faltam (fat. indireto)", () => falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")));
 }
 function barrasH(R) {
   const W = 760, lh = 24, lx = 230, H = R.length * lh + 10, max = Math.max(...R.map((r) => r.tot));
