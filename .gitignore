@@ -1,0 +1,6 @@
+# planilhas de clientes nunca vão para o repositório
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+~$*

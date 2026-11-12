@@ -1,0 +1,35 @@
+{
+  "versao_leitura": 1,
+  "prefixo_bases_geradas": "painel_esgoto_",
+  "meta_produtividade": 0.7,
+  "os": {
+    "rotulo": "OS executadas (atividades)",
+    "reconhece_nome": ["atividades", "os executadas", "execucao"],
+    "colunas_obrigatorias": ["Recurso", "Status da Atividade", "Matrícula", "Código/Descrição"],
+    "colunas": {
+      "id": "ID da Atividade", "recurso": "Recurso", "matricula": "Matrícula", "codigo": "Código/Descrição",
+      "status": "Status da Atividade", "data": "Data", "cidade": "Cidade", "bairro": "Bairro",
+      "endereco": "Endereço", "cliente": "Nome do Solicitante", "adicionais": "Serviço adicionais resposta"
+    },
+    "codigo_alvo": "SONDAGEM DE REDE DE ESGOTO",
+    "status_executada": ["FINALIZADA", "ENCERRADA COM OCORRENCIA"],
+    "implantacao": "IMPLANTACAO DE LIGACAO DE ESGOTO"
+  },
+  "base": {
+    "rotulo": "Base de ligações por logradouro",
+    "reconhece_nome": ["base", "ligacoes", "logradouro"],
+    "colunas_obrigatorias": ["NUM_LIGACAO", "NOM_LOGRADOURO"],
+    "colunas": {
+      "matricula": "NUM_LIGACAO", "cliente": "NOM_CLIENTE", "cidade": "CIDADE", "bairro": "NOM_BAIRRO",
+      "logradouro": "NOM_LOGRADOURO", "endereco": "END_LIGACAO", "faturamento": "TIPO_FATURAMENTO",
+      "engenharia": "Engenharia execução", "situacao": "SIT_LIG"
+    },
+    "faturamento_padronizacao_contem": "ESGOTO",
+    "engenharia_valores_nao": ["", "NAO", "N", "0", "PENDENTE", "NAO EXECUTADO", "NAN"]
+  },
+  "classes_faturamento": {
+    "IND": "Fat. indireto esgoto (só água)",
+    "PAD": "Padronização (água + esgoto)",
+    "SEM": "Sem informação"
+  }
+}
