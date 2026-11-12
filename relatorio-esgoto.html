@@ -7,9 +7,16 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{--navy:#102840;--blue:#176b9c;--cyan:#16a5b8;--ink:#1f2d3d;--muted:#64748b;--line:#dbe4ec;--bg:#f3f6f9;
---marinho:#1A2740;--azul:#394D73;--azul-claro:#49668C;--tint:#e7f0f6;--zebra:#f7fafc;--laranja:#E8710A;--laranja-texto:#C2560C;
---ok-fundo:#dcfce7;--ok-texto:#166534;--atencao-fundo:#ffedd5;--atencao-texto:#9a3412;--agua-fundo:#e0f2fe;--agua-texto:#075985;--esgoto-fundo:#ede9fe;--esgoto-texto:#5b21b6;--card:#fff}
+:root{
+  --navy:#102840;--blue:#176b9c;--cyan:#16a5b8;--ink:#1f2d3d;--muted:#64748b;--line:#dbe4ec;--bg:#f3f6f9;
+  --preto:#05050D;--marinho:#1A2740;--azul:#394D73;--azul-claro:#49668C;--cinza:#F2F2F2;
+  --linha:#dbe4ec;--tint:#e7f0f6;--zebra:#f7fafc;--laranja:#E8710A;--laranja-texto:#C2560C;
+  --neg-fundo:#FFC7CE;--neg-texto:#9C0006;--ok-fundo:#dcfce7;--ok-texto:#166534;
+  --atencao-fundo:#ffedd5;--atencao-borda:#f59e0b;--atencao-texto:#9a3412;
+  --editavel-fundo:#FFF8E1;--editavel-borda:#E0C070;
+  --agua-fundo:#e0f2fe;--agua-texto:#075985;--esgoto-fundo:#ede9fe;--esgoto-texto:#5b21b6;--info-fundo:#e0e7ff;--info-texto:#3730a3;
+  --graf-anterior:#A7B5CB;--graf-atual:#1A2740;--graf-alerta:#E8710A;
+  --op-trilho:#DCE6EE;--card:#fff}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif;font-size:14px}
 header{background:linear-gradient(135deg,#0b2447 0%,#14375e 60%,#1b4a76 100%);color:#fff;padding:18px 16px}
@@ -36,10 +43,15 @@ table{width:100%;border-collapse:collapse;font-family:'IBM Plex Sans Condensed',
 th{background:var(--marinho);color:#fff;text-align:left;padding:6px;position:sticky;top:0;white-space:nowrap}
 td{padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 tr:nth-child(even) td{background:var(--zebra)}
+tr:hover td{background:#f2f8fc}
 tr.tot td{background:var(--tint);font-weight:700}
 td.n{text-align:right}
-.bar{height:6px;background:#DCE6EE;border-radius:3px;min-width:60px}.bar i{display:block;height:100%;background:var(--cyan);border-radius:3px}
+.bar{height:6px;background:var(--op-trilho);border-radius:3px;min-width:60px}.bar i{display:block;height:100%;background:linear-gradient(90deg,#16a5b8,#7ee0bc);border-radius:3px}
 .low{color:var(--laranja-texto);font-weight:600}
+.bar.alerta i{background:var(--laranja)}
+td.ok{background:var(--ok-fundo)!important;color:var(--ok-texto);font-weight:600}
+.cfg textarea:focus,.tool input:focus{outline:2px solid var(--cyan)}
+.msg.erro{color:var(--atencao-texto);background:var(--atencao-fundo);border:1px solid var(--atencao-borda);padding:6px;border-radius:6px}
 .tag{padding:1px 6px;border-radius:10px;font-size:11px}
 .tag.ind{background:var(--esgoto-fundo);color:var(--esgoto-texto)}.tag.pad{background:var(--agua-fundo);color:var(--agua-texto)}
 h3{font-size:13px;color:var(--azul);margin:8px 0}
@@ -158,7 +170,7 @@ document.getElementById('go').onclick=async()=>{
     }
     ruas(baseMap,grupos);
     msg.textContent=`${fmt(os.length)} linhas de OS · ${fmt(base.length)} matrículas na base · ${fmt(semBase)} OS sem matrícula na base.`;
-  }catch(e){msg.textContent='Erro: '+e;console.error(e)}
+  msg.classList.remove('erro');}catch(e){msg.textContent='Erro: '+e;msg.classList.add('erro');console.error(e)}
 };
 
 function painel(nome,L){
@@ -169,7 +181,7 @@ function painel(nome,L){
   const ind=L.filter(x=>x.exec&&x.impl&&x.b?.fat==='Fat. indireto esgoto').length;
   const pad=L.filter(x=>x.exec&&x.impl&&x.b?.fat==='Padronização').length;
   const linhas=[...por].sort((a,b)=>b[1].e-a[1].e).map(([r,o])=>{const p=o.e/o.v;
-    return `<tr><td>${esc(r)}</td><td class=n>${o.v}</td><td class=n>${o.e}</td><td class="n ${p<CFG.metaProd?'low':''}">${pct(p)}</td><td><div class=bar><i style="width:${Math.min(100,p*100)}%"></i></div></td><td class=n>${o.i}</td><td class=n>${o.ind}</td><td class=n>${o.pad}</td></tr>`}).join('');
+    return `<tr><td>${esc(r)}</td><td class=n>${o.v}</td><td class=n>${o.e}</td><td class="n ${p<CFG.metaProd?'low':''}">${pct(p)}</td><td><div class="bar ${p<CFG.metaProd?'alerta':''}"><i style="width:${Math.min(100,p*100)}%"></i></div></td><td class=n>${o.i}</td><td class=n>${o.ind}</td><td class=n>${o.pad}</td></tr>`}).join('');
   return `<div class=panel><h2>${nome}</h2><div class=kpis>
    <div class=kpi><span>Equipes ativas</span><b>${por.size}</b></div>
    <div class=kpi><span>Visitas</span><b>${fmt(vis)}</b></div>
@@ -193,7 +205,7 @@ function ruas(baseMap,grupos){
   el.innerHTML=`<h2>Execução por logradouro (matrícula × base)</h2>
    <input id=fRua placeholder="Filtrar rua…" style="padding:6px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;width:100%;max-width:320px">
    <div class=tw style="max-height:560px"><table id=tR><tr><th>Logradouro</th><th>Bairro</th><th>Ligações base</th><th>Fat. indireto (só água)</th><th>Padronização (água+esgoto)</th><th>Engenharia (base)</th><th>Engenharia (OS)</th><th>Serviços (OS)</th><th>Feitas</th><th>Faltam</th><th>% concluído</th></tr>
-   ${rows.map(r=>`<tr><td>${esc(r.rua)}</td><td>${esc(r.b||'')}</td><td class=n>${r.tot}</td><td class=n>${r.ind}</td><td class=n>${r.pad}</td><td class=n>${r.engBase}</td><td class=n>${r.eng.size}</td><td class=n>${r.srv.size}</td><td class=n>${r.feitas}</td><td class="n ${r.falta?'low':''}">${r.falta}</td><td><div class=bar><i style="width:${r.tot?Math.min(100,r.feitas/r.tot*100):0}%"></i></div></td></tr>`).join('')}
+   ${rows.map(r=>`<tr><td>${esc(r.rua)}</td><td>${esc(r.b||'')}</td><td class=n>${r.tot}</td><td class=n>${r.ind}</td><td class=n>${r.pad}</td><td class=n>${r.engBase}</td><td class=n>${r.eng.size}</td><td class=n>${r.srv.size}</td><td class=n>${r.feitas}</td><td class="n ${r.falta?'low':'ok'}">${r.falta}</td><td><div class=bar><i style="width:${r.tot?Math.min(100,r.feitas/r.tot*100):0}%"></i></div></td></tr>`).join('')}
    <tr class=tot><td>Total</td><td></td><td class=n>${fmt(t.tot)}</td><td></td><td></td><td></td><td></td><td></td><td class=n>${fmt(t.f)}</td><td class=n>${fmt(t.fa)}</td><td>${pct(t.f/t.tot)}</td></tr></table></div>`;
   document.getElementById('fRua').oninput=e=>{const q=norm(e.target.value);for(const tr of document.querySelectorAll('#tR tr:not(:first-child):not(.tot)'))tr.hidden=!norm(tr.cells[0].textContent).includes(q)};
 }
