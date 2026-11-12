@@ -44,11 +44,28 @@ td.n{text-align:right}
 .tag.ind{background:var(--esgoto-fundo);color:var(--esgoto-texto)}.tag.pad{background:var(--agua-fundo);color:var(--agua-texto)}
 h3{font-size:13px;color:var(--azul);margin:8px 0}
 .full{margin-top:16px}
+.tabs{display:flex;gap:4px;background:#fff;border-bottom:1px solid var(--line);padding:0 16px}
+.tabs button{background:none;color:var(--muted);border-radius:0;border-bottom:3px solid transparent;padding:12px 14px}
+.tabs button.on{color:var(--blue);border-bottom-color:var(--cyan)}
+.rec td label{margin-right:10px;cursor:pointer}
+.tool{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
+.tool input{padding:6px;border:1px solid var(--line);border-radius:6px;min-width:220px}
+.tool button{padding:6px 10px;font-size:12px}
 </style>
 </head>
 <body>
 <header><small>Águas do Rio · Relatório Executivo</small><h1>Produtividade · Execução de Esgoto</h1></header>
+<nav class="tabs"><button class="on" data-t="vRel">Relatório</button><button data-t="vDados">Dados · Recursos</button></nav>
 <main>
+<div id="vDados" hidden>
+ <div class="panel"><h2>Seleção de recursos</h2>
+  <div class="tool"><input id="qRec" placeholder="Buscar recurso…">
+   <button data-all="eng">Filtrados → Engenharia</button><button data-all="srv">Filtrados → Serviços</button><button data-all="">Filtrados → Ignorar</button>
+   <span class="msg" id="recInfo">Escolha a planilha de OS para listar os recursos.</span></div>
+  <div class="tw" style="max-height:620px"><table class="rec" id="tRec"></table></div>
+ </div>
+</div>
+<div id="vRel">
 <section class="cfg">
   <div><label>1. Planilha de OS executadas (.xlsx/.csv)</label><input type="file" id="fOS" accept=".xlsx,.xls,.csv"></div>
   <div><label>2. Base de matrículas / logradouros (.xlsx/.csv)</label><input type="file" id="fBase" accept=".xlsx,.xls,.csv"></div>
@@ -58,6 +75,7 @@ h3{font-size:13px;color:var(--azul);margin:8px 0}
 </section>
 <div class="cols" id="cols"></div>
 <div class="panel full" id="ruas" hidden></div>
+</div>
 </main>
 <script>
 /* ======== CONFIGURAÇÃO (ajuste aqui se os nomes mudarem) ======== */
@@ -87,6 +105,26 @@ function col(rows,name){ // acha a coluna ignorando acento/maiúscula
   if(!rows.length)return name;const t=norm(name);return Object.keys(rows[0]).find(k=>norm(k)===t)||name}
 const tipoFat=v=>{const t=norm(v);if(!t)return 'Sem info';return t.includes('ESGOTO')?'Padronização':'Fat. indireto esgoto'};
 const engFeita=v=>{const t=norm(v);return t!==''&&!['NAO','N','0','NAO EXECUTADO','PENDENTE'].includes(t)};
+
+/* ---- abas ---- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  for(const id of ['vRel','vDados'])document.getElementById(id).hidden=id!==b.dataset.t});
+/* ---- seleção de recursos (salva no navegador) ---- */
+let SEL={};try{SEL=JSON.parse(localStorage.getItem('selRecursos')||'{}')}catch(e){}
+let RECS=[];
+function salvaSel(){try{localStorage.setItem('selRecursos',JSON.stringify(SEL))}catch(e){}
+  const n=Object.keys(SEL);rEng.value=RECS.filter(r=>SEL[norm(r.n)]==='eng').map(r=>r.n).join('\n');
+  rSrv.value=RECS.filter(r=>SEL[norm(r.n)]==='srv').map(r=>r.n).join('\n');
+  recInfo.textContent=`${RECS.length} recursos · ${RECS.filter(r=>SEL[norm(r.n)]==='eng').length} Engenharia · ${RECS.filter(r=>SEL[norm(r.n)]==='srv').length} Serviços`}
+function desenhaRecs(){const q=norm(qRec.value);
+  tRec.innerHTML='<tr><th>Recurso</th><th>OS sondagem</th><th>Grupo</th></tr>'+RECS.filter(r=>norm(r.n).includes(q)).map(r=>{const k=norm(r.n),v=SEL[k]||'';
+   return `<tr><td>${esc(r.n)}</td><td class=n>${r.q}</td><td>${[['eng','Engenharia'],['srv','Serviços'],['','Ignorar']].map(([val,l])=>`<label><input type=radio name="g_${esc(k)}" value="${val}" ${v===val?'checked':''} data-k="${esc(k)}"> ${l}</label>`).join('')}</td></tr>`}).join('')}
+tRec.onchange=e=>{const k=e.target.dataset.k;if(k===undefined)return;if(e.target.value)SEL[k]=e.target.value;else delete SEL[k];salvaSel()};
+qRec.oninput=desenhaRecs;
+document.querySelectorAll('[data-all]').forEach(b=>b.onclick=()=>{const q=norm(qRec.value);for(const r of RECS)if(norm(r.n).includes(q)){const k=norm(r.n);if(b.dataset.all)SEL[k]=b.dataset.all;else delete SEL[k]}salvaSel();desenhaRecs()});
+fOS.onchange=async()=>{try{const os=await readFile(fOS);const cR=col(os,CFG.os.recurso),cC=col(os,CFG.os.codigo),alvo=norm(CFG.codigoAlvo);const m=new Map();
+  for(const r of os){const n=String(r[cR]).trim();if(!n)continue;const o=m.get(n)||{n,q:0};if(norm(r[cC]).includes(alvo))o.q++;m.set(n,o)}
+  RECS=[...m.values()].sort((a,b)=>b.q-a.q||a.n.localeCompare(b.n));salvaSel();desenhaRecs()}catch(e){recInfo.textContent='Erro: '+e}};
 
 document.getElementById('go').onclick=async()=>{
   const msg=document.getElementById('msg');
