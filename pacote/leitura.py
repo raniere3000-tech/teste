@@ -110,6 +110,7 @@ def _os(df):
             "d": _data_iso(g(row, "data")), "c": g(row, "cidade"), "b": g(row, "bairro"),
             "en": g(row, "endereco"), "cl": g(row, "cliente"), "s": st,
             "e": e, "i": e and impl in norm(g(row, "adicionais")),
+            "cod": g(row, "codigo"), "ad": g(row, "adicionais"), "fim": g(row, "fim"),
         })
     faltando = [R["colunas"][k] for k, v in C.items() if v is None]
     return regs, {"fora_do_codigo": fora, "colunas_ausentes": faltando}
@@ -132,6 +133,7 @@ def _base(df):
             "m": m, "cl": g(row, "cliente"), "c": g(row, "cidade"), "b": g(row, "bairro"),
             "rua": g(row, "logradouro") or "SEM LOGRADOURO", "en": g(row, "endereco"),
             "f": cl, "fr": fr, "eng": norm(g(row, "engenharia")) not in nao, "sit": g(row, "situacao"),
+            "sub": g(row, "subcategoria"), "eco": g(row, "economias"), "engv": g(row, "engenharia"),
         })
     faltando = [R["colunas"][k] for k, v in C.items() if v is None]
     return regs, {"colunas_ausentes": faltando}

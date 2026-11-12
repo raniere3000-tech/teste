@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v4</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v5</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v4-20261112";
+const VERSAO_SITE = "v5-20261112";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -288,8 +288,9 @@ function monta(ultima) {
       if (vistos.has(k)) { dup++; continue; } vistos.add(k); os.push(r);
     }
   }
-  for (const r of os) { r.B = base.get(r.m) || null; r.mes = (r.d || "").slice(0, 7); }
-  D = { os, base, arquivos: ultima.arquivos, quando: ultima.quando, dup };
+  const porMat = new Map();
+  for (const r of os) { r.B = base.get(r.m) || null; r.mes = (r.d || "").slice(0, 7); if (r.m) { const l = porMat.get(r.m) || []; l.push(r); porMat.set(r.m, l); } }
+  D = { os, base, porMat, arquivos: ultima.arquivos, quando: ultima.quando, dup };
   montaFiltros(); desenha();
   $("status").textContent = `Última leitura: ${new Date(ultima.quando).toLocaleString("pt-BR")} · ${num(os.length)} OS de sondagem · ${num(base.size)} ligações na base`;
 }
@@ -347,9 +348,9 @@ const fechaLateral = () => $("lateral").classList.remove("on");
 $("latX").onclick = fechaLateral;
 document.addEventListener("keydown", (e) => e.key === "Escape" && fechaLateral());
 document.addEventListener("mousedown", (e) => { if ($("lateral").classList.contains("on") && !$("lateral").contains(e.target) && !e.target.closest(".lk")) fechaLateral(); });
-$("latCsv").onclick = () => LAT && baixaCSV(`painel_esgoto_lista.csv`, ["Matrícula", "Cliente", "Logradouro", "Tipo faturamento", "Situação"], LAT.linhas.map((l) => [l.m, l.cl, l.rua, l.fr ?? l.f, l.sit]));
+$("latCsv").onclick = () => LAT && baixaCSV(`painel_esgoto_lista.csv`, CAB_DET, LAT.linhas.map((l) => l.base ? linhaDet(l.base, l.sit) : linhaDet({ m: l.m, cl: l.cl, rua: l.rua, f: l.f, fr: l.fr, sit: "", b: "", c: "" }, l.sit)));
 const linhaOS = (r) => ({ m: r.m, cl: r.B?.cl || r.cl, rua: r.B?.rua || r.en, f: r.B?.f || "", fr: r.B?.fr || "", sit: `${r.s} · ${dataBR(r.d)} · ${r.r}` });
-const linhaBase = (b, sit) => ({ m: b.m, cl: b.cl, rua: b.rua, f: b.f, fr: b.fr, sit });
+const linhaBase = (b, sit) => ({ m: b.m, cl: b.cl, rua: b.rua, f: b.f, fr: b.fr, sit, base: b });
 const CLIQUES = new Map(); let nClique = 0;
 const lk = (n, titulo, fn) => { if (!n) return `<td class="n">-</td>`; const id = "c" + (nClique++); CLIQUES.set(id, () => abreLateral(titulo, fn())); return `<td class="n lk" data-c="${id}">${num(n)}</td>`; };
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-c]"); if (t && CLIQUES.has(t.dataset.c)) CLIQUES.get(t.dataset.c)(); });
@@ -470,7 +471,24 @@ document.addEventListener("click", (e) => {
   if (e.target.dataset.m2 === "csv-ruas") csvRuas();
   const g = e.target.dataset.csvg; if (g && D) { const L = osFiltradas().filter((r) => grupo(r.r) === g); baixaCSV(`painel_esgoto_${g}.csv`, ["Recurso", "Data", "Matrícula", "Status", "Executada", "Implantação", "Logradouro", "Tipo faturamento"], L.map((r) => [r.r, dataBR(r.d), r.m, r.s, r.e ? "Sim" : "Não", r.i ? "Sim" : "Não", r.B?.rua || "", r.B?.fr || ""])); }
 });
-function csvRuas() { baixaCSV("painel_esgoto_logradouros.csv", ["Logradouro", "Bairro", "Cidade", "Ligações", "Fat. indireto", "Padronização", "Engenharia (base)", "Engenharia (OS)", "Serviços", "Feitas", "Faltam", "Faltam fat. indireto"], situacaoRuas().map((r) => [r.rua, r.bairro, r.cid, r.tot, r.ind, r.pad, r.engB.length, r.engO.length, r.srv.length, r.feitas, r.falta.length, r.faltaInd])); }
+// OS que representa a ligação: a última executada com implantação; senão a última executada; senão a última visita
+function osDaLigacao(m) {
+  const L = (D.porMat.get(m) || []).slice().sort((a, b) => (b.d || "").localeCompare(a.d || ""));
+  return L.find((r) => r.e && r.i) || L.find((r) => r.e) || L[0] || null;
+}
+const CAB_DET = ["Logradouro", "Bairro", "Cidade (base)", "Matrícula", "Cliente (base)", "Situação na rua", "Tipo faturamento", "Classe faturamento", "SIT_LIG", "SUB_CATEGORIA", "TOTAL_ECO", "Engenharia execução",
+  "Nº da OS", "Recurso", "Grupo", "Código/Descrição", "Data", "Data de execução (Fim)", "Status da Atividade", "Executada", "Implantação", "Nome do Solicitante", "Cidade (OS)", "Serviço adicionais resposta", "Qtd. OS da matrícula"];
+function linhaDet(b, situacao) {
+  const o = osDaLigacao(b.m), n = (D.porMat.get(b.m) || []).length;
+  return [b.rua, b.b, b.c, b.m, b.cl, situacao, b.fr, CLS()[b.f] || "", b.sit, b.sub ?? "", b.eco ?? "", b.engv ?? "",
+    o?.id || "", o?.r || "", o ? GN[grupo(o.r)] : "", o?.cod || "", dataBR(o?.d), o?.fim || "", o?.s || "", o ? (o.e ? "Sim" : "Não") : "", o ? (o.i ? "Sim" : "Não") : "", o?.cl || "", o?.c || "", o?.ad || "", n || ""];
+}
+function situacaoLig(r, b) { return r.engB.includes(b) ? "Feita · Engenharia (base)" : r.engO.includes(b) ? "Feita · Engenharia (OS)" : r.srv.includes(b) ? "Feita · Serviços (OS)" : "Falta"; }
+function csvRuas() {
+  const q = norm(BUSCA_RUA), linhas = [];
+  for (const r of situacaoRuas()) { if (q && !norm(r.rua).includes(q)) continue; for (const b of r.L) linhas.push(linhaDet(b, situacaoLig(r, b))); }
+  baixaCSV("painel_esgoto_logradouros_detalhado.csv", CAB_DET, linhas);
+}
 function csvOS() { baixaCSV("painel_esgoto_os_cruzadas.csv", ["Recurso", "Grupo", "Data", "Matrícula", "Status", "Executada", "Implantação", "Na base?", "Logradouro", "Bairro", "Cidade", "Tipo faturamento", "Classe"], osFiltradas().map((r) => [r.r, GN[grupo(r.r)], dataBR(r.d), r.m, r.s, r.e ? "Sim" : "Não", r.i ? "Sim" : "Não", r.B ? "Sim" : "Não", r.B?.rua || "", r.B?.b || r.b, r.B?.c || r.c, r.B?.fr || "", r.B ? CLS()[r.B.f] : ""])); }
 
 /* ================= aba Dados ================= */
