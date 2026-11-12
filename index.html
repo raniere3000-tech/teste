@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v6</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v7</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v6-20261112";
+const VERSAO_SITE = "v7-20261112";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -194,12 +194,13 @@ let REGRAS = { meta_produtividade: 0.7, prefixo_bases_geradas: "painel_esgoto_",
 const regrasProntas = fetch("pacote/regras.json?v=" + VERSAO_SITE).then((r) => r.json()).then((j) => REGRAS = j).catch(() => {});
 const CLS = () => REGRAS.classes_faturamento;
 let AJ = {}; try { AJ = JSON.parse(localStorage.getItem("regrasPainel") || "{}"); } catch (e) {}
+if (AJ.v !== 2) { delete AJ.impl; AJ.v = 2; if (Object.keys(AJ).length === 1) AJ = {}; }
 function RG() {
   const o = REGRAS.os || {}, b = REGRAS.base || {};
   return {
     codigo: o.codigo_alvo || "SONDAGEM DE REDE DE ESGOTO",
     status: AJ.status ?? o.status_executada ?? ["FINALIZADA", "ENCERRADA COM OCORRENCIA"],
-    impl: AJ.impl ?? o.implantacao ?? "IMPLANTACAO DE LIGACAO DE ESGOTO",
+    impl: AJ.impl ?? o.implantacao ?? "",
     meta: AJ.meta ?? REGRAS.meta_produtividade ?? 0.7,
     pad: AJ.pad ?? b.faturamento_padronizacao_contem ?? "ESGOTO",
     engNao: AJ.engNao ?? b.engenharia_valores_nao ?? [""],
@@ -417,7 +418,7 @@ function abaProd() {
   const L = osFiltradas(), G = porGrupo(L), meta = RG().meta;
   const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo);
   const eq = (g) => G[g] ? [...G[g].rec.values()].length : 0;
-  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Produtividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Ligações implantadas", num(T.im))}${kpi("Fat. indireto esgoto", num(T.ind), "só água → receita nova")}${kpi("Padronização", num(T.pad), "já fatura esgoto")}</div>`;
+  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Produtividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
   const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
   h += `<div class="duas">${cards.join("")}</div>`;
   h += cardGrafMes(L);
@@ -425,13 +426,13 @@ function abaProd() {
 }
 function cardGrupo(g, o) {
   const meta = RG().meta;
-  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantadas = executadas com IMPLANTAÇÃO DE LIGAÇÃO DE ESGOTO em Serviço adicionais resposta. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
   const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex);
   const T = resumo(o.L);
-  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantadas`, () => R.imL.map(linhaOS))}${lk(R.ind, `${nome} · fat. indireto`, () => R.imL.filter((r) => r.B?.f === "IND").map(linhaOS))}${lk(R.pad, `${nome} · padronização`, () => R.imL.filter((r) => r.B?.f === "PAD").map(linhaOS))}</tr>`;
+  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}</tr>`;
   return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Produtividade", pct(T.prod), "", T.prod < meta)}${kpi("Exec./equipe", num(T.ex / recs.length))}</div>
-  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th></th><th class="n">Implant.</th><th class="n">Fat. ind.</th><th class="n">Padron.</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
+  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
 }
 function barras(meses, series, alt = 220) {
   const W = Math.max(520, meses.length * 70), H = alt, pad = { l: 36, b: 28, t: 18, r: 8 };
@@ -520,10 +521,10 @@ function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
   const fim = D.os.map((r) => r.d).filter(Boolean).sort().pop(); const dI = new Date(fim + "T00:00:00"); dI.setDate(dI.getDate() - 6); const ini = dI.toISOString().slice(0, 10);
   const L = D.os.filter((r) => r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
-  const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td><td class="n">${num(R.ind)}</td><td class="n">${num(R.pad)}</td></tr>`; };
+  const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
   const ruas = situacaoRuas().filter((r) => r.falta.length).slice(0, 5);
   return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
-  <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implant.</th><th class="n">Fat. ind.</th><th class="n">Padron.</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
+  <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implantação</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
   ${ruas.length ? `<h4 style="margin:12px 0 4px;color:#394D73">Ruas com mais ligações faltando</h4><table><thead><tr><th>Logradouro</th><th class="n">Ligações</th><th class="n">Feitas</th><th class="n">Faltam</th></tr></thead><tbody>${ruas.map((r) => `<tr><td>${esc(r.rua)}</td><td class="n">${num(r.tot)}</td><td class="n">${num(r.feitas)}</td><td class="n low">${num(r.falta.length)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`;
 }
 function abaDados() {
@@ -563,8 +564,7 @@ function abaDados() {
     <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
     <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
-    <li><b>Implantadas</b> = executadas com "IMPLANTAÇÃO DE LIGAÇÃO DE ESGOTO" em Serviço adicionais resposta.</li>
-    <li><b>Fat. indireto</b> = implantadas cujo TIPO_FATURAMENTO na base é só água (vai gerar faturamento novo de esgoto). <b>Padronização</b> = já fatura água e esgoto.</li>
+    <li><b>Implantação</b> = toda OS executada (ou só as que têm o texto da regra 4, se preenchido).</li>
     <li>OS repetidas (mesmo ID da Atividade em mais de um arquivo) contam uma vez só.</li></ul></div></details>
   <details><summary>Como foi calculado · Logradouros</summary><div><ul class="av">
     <li>A Matrícula da OS é cruzada com o NUM_LIGACAO da base (zeros à esquerda e pontuação são ignorados).</li>
@@ -581,7 +581,7 @@ function regrasHTML() {
   return bloco(1, "Visita (entra na conta)", `OS com Código/Descrição contendo <b>${esc(R.codigo)}</b>. As outras OS são ignoradas na leitura. <span style="color:var(--muted)">(muda em pacote/regras.json)</span>`)
     + bloco(2, "OS executada (produtividade)", `Status da Atividade que contam como executada:<div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px">${stTodos.map((x) => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="rgSt" value="${esc(x)}" ${marc.has(norm(x)) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Produtividade = executadas ÷ visitas. A lista mostra os status encontrados nas planilhas.</div>`)
     + bloco(3, "Meta de produtividade", `${inp("rgMeta", Math.round(R.meta * 1000) / 10, 80)} % — abaixo disso fica em laranja.`)
-    + bloco(4, "Ligação implantada (OS)", `OS executada cuja coluna <b>Serviço adicionais resposta</b> contém: ${inp("rgImpl", R.impl)}<div style="color:var(--muted);font-size:12px">Maiúsculas e acentos não importam.</div>`)
+    + bloco(4, "Implantação (OS)", `${R.impl ? "OS executada cuja coluna <b>Serviço adicionais resposta</b> contém o texto abaixo." : "<b>Toda OS executada conta como implantação.</b>"} Para exigir um texto em <b>Serviço adicionais resposta</b>, escreva aqui (vazio = toda executada): ${inp("rgImpl", R.impl)}<div style="color:var(--muted);font-size:12px">Maiúsculas e acentos não importam.</div>`)
     + bloco(5, "Ligação feita na rua (aba Logradouros)", `Cada ligação da base conta uma vez, nesta ordem:<ol style="margin:4px 0;padding-left:20px"><li><b>Engenharia (base)</b>: coluna <b>Engenharia execução</b> preenchida com qualquer valor, exceto: ${inp("rgEng", R.engNao.map((v) => v || "(vazio)").join(", "), 520)}</li><li><b>Engenharia (OS)</b>: ligação implantada (regra 4) por um recurso do grupo Engenharia;</li><li><b>Serviços (OS)</b>: ligação implantada por um recurso do grupo Serviços;</li><li>senão, <b>Falta</b>.</li></ol><div style="color:var(--muted);font-size:12px">Usa todo o histórico de OS, sem o filtro de mês. A matrícula da OS é cruzada com NUM_LIGACAO (zeros à esquerda e pontuação ignorados).</div>`)
     + bloco(6, "Tipo de faturamento", `<span class="tag PAD">Padronização</span> quando TIPO_FATURAMENTO contém ${inp("rgPad", R.pad, 140)} · <span class="tag IND">Fat. indireto esgoto</span> quando não contém (só água → receita nova de esgoto) · <span class="tag SEM">Sem informação</span> quando vazio.`)
     + bloco(7, "Equipes e grupos", `Equipe ativa = recurso diferente com pelo menos uma OS no período. Engenharia × Serviços vem da seleção em <b>Recursos</b>. OS repetidas (mesmo ID da Atividade) contam uma vez.`)
@@ -591,7 +591,7 @@ function ligaRegras() {
   const a = $("rgAplica"); if (!a) return;
   a.onclick = () => {
     const meta = parseFloat(String($("rgMeta").value).replace(",", ".")) / 100;
-    AJ = { status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
+    AJ = { v: 2, status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
       engNao: $("rgEng").value.split(",").map((x) => x.trim()).map((x) => /^\(?vazio\)?$/i.test(x) ? "" : x), meta: isFinite(meta) && meta > 0 ? meta : RG().meta };
     if (!AJ.engNao.includes("")) AJ.engNao.push("");
     try { localStorage.setItem("regrasPainel", JSON.stringify(AJ)); } catch (e) {}

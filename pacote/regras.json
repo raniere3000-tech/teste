@@ -34,7 +34,8 @@
       "Finalizada",
       "Encerrada com Ocorrência"
     ],
-    "implantacao": "IMPLANTAÇÃO DE LIGAÇÃO DE ESGOTO"
+    "implantacao": "",
+    "implantacao_obs": "vazio = toda OS executada conta como implantação"
   },
   "base": {
     "rotulo": "Base de ligações por logradouro",

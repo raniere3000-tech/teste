@@ -1,5 +1,5 @@
 /* Web Worker: lê as planilhas com Python (Pyodide) e devolve JSON para a página. */
-const VERSAO = "v5-20261112";
+const VERSAO = "v7-20261112";
 const PYODIDE_VERSAO = "0.29.5";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSAO}/full/`;
 const ARQUIVOS_PY = ["pacote/__init__.py", "pacote/leitura.py", "pacote/regras.json"];
