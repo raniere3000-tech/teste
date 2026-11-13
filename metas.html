@@ -292,7 +292,7 @@ async function saveVal(id, patch) {
 }
 const b64 = buf => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 async function upload(indId, files) {
-  if (dir) { for (const f of files) { try { await gravarArquivo(indId, f); toast('Salvo em ' + pastaDe(IND[indId]) + '/' + f.name); } catch (e) { toast('Falha ao gravar ' + f.name + ': ' + e.message, true); } } return lerPasta(); }
+  if (dir) { for (const f of files) { try { await gravarArquivo(indId, f); toast('Salvo em ' + usos[indId].length + ' pasta(s) de meta: ' + f.name); } catch (e) { toast('Falha ao gravar ' + f.name + ': ' + e.message, true); } } return lerPasta(); }
   if (!assets || !db) { toast('Para anexar, abra o painel no claude.ai como editor.', true); return; }
   for (const f of files) {
     try {
@@ -310,8 +310,14 @@ async function upload(indId, files) {
 
 // ---- pasta conectada (Chrome/Edge fora do claude.ai) ----
 let dir = null;
-const pastaDe = I => I.nome.normalize('NFD').replace(/\p{M}/gu, '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 120);
-const PASTA2IND = Object.fromEntries(DATA.ind.map(I => [pastaDe(I).toLowerCase(), I.id]));
+const limpaNome = (s, n) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, n).replace(/[\s.;,-]+$/, '');
+const chave = s => limpaNome(s, 200).toLowerCase();
+const pastaCargo = c => limpaNome(c.nome, 80);
+const pastaMeta = m => limpaNome(m.c + ' - ' + m.t, 70);
+const PASTA2META = {};
+CARGOS.forEach(c => c.metas.forEach(m => PASTA2META[chave(pastaCargo(c)) + '|' + chave(pastaMeta(m))] = { c, m }));
+const pastaDe = I => usos[I.id].map(u => pastaCargo(u.c) + '/' + u.m.c).join(', ');
+const INDICE = '_indice-evidencias.json';
 function idb(fn) { return new Promise((ok, ko) => { const r = indexedDB.open('metas2026', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onerror = () => ko(r.error); r.onsuccess = () => { const t = r.result.transaction('h', 'readwrite'); const q = fn(t.objectStore('h')); t.oncomplete = () => ok(q && q.result); t.onerror = () => ko(t.error); }; }); }
 async function conectarPasta(nova) {
   try {
@@ -322,32 +328,67 @@ async function conectarPasta(nova) {
   } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível conectar a pasta: ' + e.message, true); }
 }
 async function lerPasta() {
-  const evs = {}; let vals = {};
+  const evs = {}; let vals = {}, indice = {};
   for await (const [nome, hd] of dir.entries()) {
-    if (hd.kind === 'file' && nome === 'dados-metas-2026.json') { try { vals = JSON.parse(await (await hd.getFile()).text()); } catch {} continue; }
-    if (hd.kind !== 'directory') continue;
-    const ind = PASTA2IND[nome.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()]; if (!ind) continue;
-    for await (const [fn, fh] of hd.entries()) {
-      if (fh.kind !== 'file' || fn.startsWith('~$') || fn.startsWith('.')) continue;
-      const f = await fh.getFile();
-      (evs[ind] ||= []).push({ id: nome + '/' + fn, ind, nome: fn, size: f.size, em: f.lastModified, fh, pasta: hd });
+    if (hd.kind !== 'file') continue;
+    if (nome === 'dados-metas-2026.json') { try { vals = JSON.parse(await (await hd.getFile()).text()); } catch {} }
+    if (nome === INDICE) { try { indice = JSON.parse(await (await hd.getFile()).text()); } catch {} }
+  }
+  const ev = (ind, fn, f, fh, pasta) => {
+    const lst = (evs[ind] ||= []); let e = lst.find(x => x.nome === fn);
+    if (!e) { e = { id: ind + '/' + fn, ind, nome: fn, size: f.size, em: f.lastModified, fh, locais: [] }; lst.push(e); }
+    if (!e.locais.some(l => l.pasta === pasta)) e.locais.push({ pasta, nome: fn });
+  };
+  for await (const [cn, ch] of dir.entries()) {
+    if (ch.kind !== 'directory') continue;
+    for await (const [mn, mh] of ch.entries()) {
+      if (mh.kind !== 'directory') continue;
+      const alvo = PASTA2META[chave(cn) + '|' + chave(mn)]; if (!alvo) continue;
+      const inds = alvo.m.comps.map(([i]) => i);
+      for await (const [fn, fh] of mh.entries()) {
+        if (fh.kind !== 'file' || fn.startsWith('~$') || fn.startsWith('.')) continue;
+        const f = await fh.getFile();
+        const marcados = inds.filter(i => (indice[i] || []).includes(fn));
+        (marcados.length ? marcados : inds).forEach(i => ev(i, fn, f, fh, mh));
+      }
     }
   }
   Object.values(evs).forEach(a => a.sort((p, q) => p.em - q.em));
-  st.evs = evs; st.vals = vals; live = true;
-  const n = Object.values(evs).reduce((s, a) => s + a.length, 0);
+  st.evs = evs; st.vals = vals; st.indice = indice; live = true;
+  const n = new Set(Object.values(evs).flat().map(e => e.nome)).size;
   setSync(true, 'Pasta: ' + dir.name + ' · ' + n + ' arquivo(s)');
   $('#banner').hidden = true;
   let pa = document.getElementById('pasta-acts');
   if (!pa) { pa = document.createElement('div'); pa.id = 'pasta-acts'; pa.className = 'pasta-acts'; $('#sync').after(pa); }
-  pa.innerHTML = '<button class="hbtn" data-pasta="ler" title="Lê de novo as subpastas e o arquivo de dados">Atualizar da pasta</button><button class="hbtn" data-pasta="nova">Trocar pasta</button>';
+  pa.innerHTML = '<button class="hbtn" data-pasta="ler" title="Lê de novo as pastas dos cargos e o arquivo de dados">Atualizar da pasta</button><button class="hbtn" data-pasta="nova">Trocar pasta</button>';
   keepFocus(render);
 }
 async function gravarDados() { const fh = await dir.getFileHandle('dados-metas-2026.json', { create: true }); const w = await fh.createWritable(); await w.write(JSON.stringify(st.vals, null, 1)); await w.close(); }
-async function gravarArquivo(indId, f) { const sub = await dir.getDirectoryHandle(pastaDe(IND[indId]), { create: true }); const fh = await sub.getFileHandle(f.name, { create: true }); const w = await fh.createWritable(); await w.write(f); await w.close(); }
+async function gravarJSON(nome, obj) { const fh = await dir.getFileHandle(nome, { create: true }); const w = await fh.createWritable(); await w.write(JSON.stringify(obj, null, 1)); await w.close(); }
+async function gravarArquivo(indId, f) {
+  const buf = await f.arrayBuffer();
+  for (const u of usos[indId]) {
+    const cd = await dir.getDirectoryHandle(pastaCargo(u.c), { create: true });
+    const md = await cd.getDirectoryHandle(pastaMeta(u.m), { create: true });
+    const fh = await md.getFileHandle(f.name, { create: true }); const w = await fh.createWritable(); await w.write(buf); await w.close();
+  }
+  const ix = st.indice || {}; ix[indId] = [...new Set([...(ix[indId] || []), f.name])]; st.indice = ix; await gravarJSON(INDICE, ix);
+}
+async function apagarArquivo(e) {
+  for (const u of usos[e.ind]) {
+    try {
+      const cd = await dir.getDirectoryHandle(pastaCargo(u.c)); const md = await cd.getDirectoryHandle(pastaMeta(u.m));
+      const outros = u.m.comps.some(([i]) => i !== e.ind && evsOf(i).some(x => x.nome === e.nome));
+      if (!outros) await md.removeEntry(e.nome).catch(() => {});
+      let vazio = true; for await (const _ of md.keys()) { vazio = false; break; } if (vazio) await cd.removeEntry(pastaMeta(u.m)).catch(() => {});
+      vazio = true; for await (const _ of cd.keys()) { vazio = false; break; } if (vazio) await dir.removeEntry(pastaCargo(u.c)).catch(() => {});
+    } catch {}
+  }
+  const ix = st.indice || {}; ix[e.ind] = (ix[e.ind] || []).filter(n => n !== e.nome); await gravarJSON(INDICE, ix);
+}
 function bannerPasta(msg) {
   $('#banner').hidden = false;
-  if (window.showDirectoryPicker) $('#banner').innerHTML = esc(msg) + ' <button class="btn sm" data-pasta="con">Conectar pasta</button> <span>Escolha a pasta onde ficarão os resultados e as evidências; o painel cria uma subpasta para cada meta.</span>';
+  if (window.showDirectoryPicker) $('#banner').innerHTML = esc(msg) + ' <button class="btn sm" data-pasta="con">Conectar pasta</button> <span>Escolha a pasta onde ficarão os resultados e as evidências; o painel cria uma pasta para cada cargo e, dentro dela, uma para cada meta com evidência.</span>';
   else $('#banner').textContent = msg + ' Para salvar em uma pasta do computador, abra esta página no Chrome ou no Edge.';
 }
 function findEv(id) { for (const a of Object.values(st.evs)) { const e = a.find(x => x.id === id); if (e) return e; } }
@@ -378,7 +419,7 @@ async function removeEv(id) {
   const e = findEv(id); if (!e) return;
   const btn = document.querySelector(`[data-rm="${id}"]`);
   if (btn && btn.dataset.sure !== '1') { btn.dataset.sure = '1'; btn.textContent = 'confirmar remoção'; return; }
-  if (e.fh) { try { await e.pasta.removeEntry(e.nome); toast('Arquivo apagado da pasta'); await lerPasta(); } catch (er) { toast('Não foi possível apagar: ' + er.message, true); } return; }
+  if (e.fh) { try { await apagarArquivo(e); toast('Arquivo apagado da pasta'); await lerPasta(); } catch (er) { toast('Não foi possível apagar: ' + er.message, true); } return; }
   try { if (db) await db.doc('evid/' + id).delete(); if (assets) assets.delete(e.asset).catch(() => {}); if (!live) { st.evs[e.ind] = evsOf(e.ind).filter(x => x.id !== id); render(); } toast('Evidência removida'); }
   catch (er) { toast('Não foi possível remover: ' + (er.message || er.code), true); }
 }
