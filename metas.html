@@ -281,12 +281,14 @@ async function saveVal(id, patch) {
   const cur = { ...(st.vals[id] || {}), ...patch, em: Date.now() };
   if (user) try { cur.por = await user.id(); } catch {}
   st.vals[id] = cur;
+  if (dir) { try { await gravarDados(); toast('Salvo na pasta'); render(); } catch (e) { toast('Não foi possível gravar na pasta: ' + e.message, true); } return; }
   if (db) { try { await db.doc('valores/' + id).set(cur); } catch (e) { toast('Não foi possível salvar: ' + (e.message || e.code), true); return; } }
   toast(live ? 'Salvo' : 'Salvo só nesta tela (sem conexão com o banco)');
   render();
 }
 const b64 = buf => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 async function upload(indId, files) {
+  if (dir) { for (const f of files) { try { await gravarArquivo(indId, f); toast('Salvo em ' + pastaDe(IND[indId]) + '/' + f.name); } catch (e) { toast('Falha ao gravar ' + f.name + ': ' + e.message, true); } } return lerPasta(); }
   if (!assets || !db) { toast('Para anexar, abra o painel no claude.ai como editor.', true); return; }
   for (const f of files) {
     try {
@@ -301,13 +303,55 @@ async function upload(indId, files) {
     } catch (e) { toast('Falha ao anexar ' + f.name + ': ' + (e.message || e.code), true); }
   }
 }
+
+// ---- pasta conectada (Chrome/Edge fora do claude.ai) ----
+let dir = null;
+const pastaDe = I => I.nome.normalize('NFD').replace(/\p{M}/gu, '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 120);
+const PASTA2IND = Object.fromEntries(DATA.ind.map(I => [pastaDe(I).toLowerCase(), I.id]));
+function idb(fn) { return new Promise((ok, ko) => { const r = indexedDB.open('metas2026', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onerror = () => ko(r.error); r.onsuccess = () => { const t = r.result.transaction('h', 'readwrite'); const q = fn(t.objectStore('h')); t.oncomplete = () => ok(q && q.result); t.onerror = () => ko(t.error); }; }); }
+async function conectarPasta(nova) {
+  try {
+    if (nova || !dir) { if (!nova) dir = await idb(s => s.get('pasta')).catch(() => null); if (!dir || nova) dir = await window.showDirectoryPicker({ id: 'metas2026', mode: 'readwrite' }); }
+    if ((await dir.queryPermission({ mode: 'readwrite' })) !== 'granted' && (await dir.requestPermission({ mode: 'readwrite' })) !== 'granted') { toast('Sem permissão para usar a pasta.', true); return; }
+    idb(s => s.put(dir, 'pasta')).catch(() => {});
+    await lerPasta(); toast('Pasta conectada: ' + dir.name);
+  } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível conectar a pasta: ' + e.message, true); }
+}
+async function lerPasta() {
+  const evs = {}; let vals = {};
+  for await (const [nome, hd] of dir.entries()) {
+    if (hd.kind === 'file' && nome === 'dados-metas-2026.json') { try { vals = JSON.parse(await (await hd.getFile()).text()); } catch {} continue; }
+    if (hd.kind !== 'directory') continue;
+    const ind = PASTA2IND[nome.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()]; if (!ind) continue;
+    for await (const [fn, fh] of hd.entries()) {
+      if (fh.kind !== 'file' || fn.startsWith('~$') || fn.startsWith('.')) continue;
+      const f = await fh.getFile();
+      (evs[ind] ||= []).push({ id: nome + '/' + fn, ind, nome: fn, size: f.size, em: f.lastModified, fh, pasta: hd });
+    }
+  }
+  Object.values(evs).forEach(a => a.sort((p, q) => p.em - q.em));
+  st.evs = evs; st.vals = vals; live = true;
+  const n = Object.values(evs).reduce((s, a) => s + a.length, 0);
+  setSync(true, 'Pasta: ' + dir.name + ' · ' + n + ' arquivo(s)');
+  $('#banner').hidden = false;
+  $('#banner').innerHTML = `Salvando na pasta <b>${esc(dir.name)}</b>. Cada indicador tem uma subpasta com o próprio nome; arquivos colocados direto nessas subpastas também aparecem como anexos. <button class="btn sm" data-pasta="ler">Atualizar da pasta</button> <button class="btn sm ghost" data-pasta="nova">Trocar pasta</button>`;
+  keepFocus(render);
+}
+async function gravarDados() { const fh = await dir.getFileHandle('dados-metas-2026.json', { create: true }); const w = await fh.createWritable(); await w.write(JSON.stringify(st.vals, null, 1)); await w.close(); }
+async function gravarArquivo(indId, f) { const sub = await dir.getDirectoryHandle(pastaDe(IND[indId]), { create: true }); const fh = await sub.getFileHandle(f.name, { create: true }); const w = await fh.createWritable(); await w.write(f); await w.close(); }
+function bannerPasta(msg) {
+  $('#banner').hidden = false;
+  if (window.showDirectoryPicker) $('#banner').innerHTML = esc(msg) + ' <button class="btn sm" data-pasta="con">Conectar pasta</button> <span>Escolha a pasta onde ficarão os resultados e as evidências; o painel cria uma subpasta para cada meta.</span>';
+  else $('#banner').textContent = msg + ' Para salvar em uma pasta do computador, abra esta página no Chrome ou no Edge.';
+}
 function findEv(id) { for (const a of Object.values(st.evs)) { const e = a.find(x => x.id === id); if (e) return e; } }
 async function fetchBytes(e) {
+  if (e.fh) return new Uint8Array(await (await e.fh.getFile()).arrayBuffer());
   const r = await fetch('/_blob/' + e.asset); if (!r.ok) throw new Error('arquivo não encontrado');
   const bin = atob((await r.text()).trim()); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u;
 }
 async function save(filename, data) {
-  if (!downloads) { toast('Download indisponível nesta visualização.', true); return; }
+  if (!downloads) { if (window.claude?.use) { toast('Download indisponível nesta visualização.', true); return; } const u = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); const a = document.createElement('a'); a.href = u; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); return; }
   try { await downloads.save({ filename, data }); } catch (e) { if (e.code !== 'declined') toast('Download não concluído: ' + (e.message || e.code), true); }
 }
 async function dlOne(id) { const e = findEv(id); if (!e) return; try { await save(e.nome, new Blob([await fetchBytes(e)])); } catch (er) { toast(er.message, true); } }
@@ -328,6 +372,7 @@ async function removeEv(id) {
   const e = findEv(id); if (!e) return;
   const btn = document.querySelector(`[data-rm="${id}"]`);
   if (btn && btn.dataset.sure !== '1') { btn.dataset.sure = '1'; btn.textContent = 'confirmar remoção'; return; }
+  if (e.fh) { try { await e.pasta.removeEntry(e.nome); toast('Arquivo apagado da pasta'); await lerPasta(); } catch (er) { toast('Não foi possível apagar: ' + er.message, true); } return; }
   try { if (db) await db.doc('evid/' + id).delete(); if (assets) assets.delete(e.asset).catch(() => {}); if (!live) { st.evs[e.ind] = evsOf(e.ind).filter(x => x.id !== id); render(); } toast('Evidência removida'); }
   catch (er) { toast('Não foi possível remover: ' + (er.message || er.code), true); }
 }
@@ -343,6 +388,7 @@ document.addEventListener('click', ev => {
   if (t.dataset.tab) return setTab(t.dataset.tab);
   if (t.dataset.area != null) { st.area = t.dataset.area; return renderCargos(); }
   if (t.dataset.cargo) { st.sel = st.sel === t.dataset.cargo ? null : t.dataset.cargo; renderCargos(); if (st.sel) $('#det')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (t.dataset.pasta) return t.dataset.pasta === 'ler' ? lerPasta().catch(e => toast(e.message, true)) : conectarPasta(t.dataset.pasta === 'nova');
   if (t.dataset.zip) return dlZip(t.dataset.zip);
   if (t.dataset.dl) return dlOne(t.dataset.dl);
   if (t.dataset.rm) return removeEv(t.dataset.rm);
@@ -367,7 +413,12 @@ function setSync(on, txt) { const s = $('#sync'); s.classList.toggle('on', on); 
 async function boot() {
   try { const t = localStorage.getItem('metas-tab'); if (t) st.tab = t; } catch {}
   setTab(st.tab);
-  if (!window.claude?.use) { setSync(false, 'Sem conexão: valores não são salvos'); $('#banner').hidden = false; $('#banner').innerHTML = 'Esta cópia do GitHub só mostra as metas. Para gravar resultados e anexar evidências, use a <a href="https://claude.ai/artifact/6WNK6U6H3QJYcgdRESvqYC" target="_blank" rel="noopener">versão no claude.ai</a>.'; return; }
+  if (!window.claude?.use) {
+    setSync(false, 'Nenhuma pasta conectada');
+    bannerPasta('Os resultados e as evidências ficam salvos em uma pasta do seu computador.');
+    try { const d = await idb(s => s.get('pasta')); if (d && (await d.queryPermission({ mode: 'readwrite' })) === 'granted') { dir = d; await lerPasta(); } else if (d) { dir = d; $('#banner').innerHTML = 'Última pasta usada: <b>' + esc(d.name) + '</b>. <button class="btn sm" data-pasta="con">Reconectar pasta</button> <button class="btn sm ghost" data-pasta="nova">Escolher outra</button>'; } } catch {}
+    return;
+  }
   const timer = setTimeout(() => { if (!live) setSync(false, 'Sem resposta do banco de dados'); }, 10000);
   [db, assets, downloads, user] = await Promise.all(['db', 'assets', 'downloads', 'user'].map(n => claude.use(n).catch(() => null)));
   if (!db) { clearTimeout(timer); setSync(false, 'Somente leitura'); $('#banner').hidden = false; $('#banner').textContent = 'Entre no claude.ai com acesso ao painel para salvar resultados e anexar evidências.'; return; }
