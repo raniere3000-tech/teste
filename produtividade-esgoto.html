@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Produtividade Esgoto</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  --navy:#102840;--blue:#176b9c;--cyan:#16a5b8;--ink:#1f2d3d;--muted:#64748b;--line:#dbe4ec;--bg:#f3f6f9;
+  --preto:#05050D;--marinho:#1A2740;--azul:#394D73;--azul-claro:#49668C;--cinza:#F2F2F2;
+  --linha:#dbe4ec;--tint:#e7f0f6;--zebra:#f7fafc;--laranja:#E8710A;--laranja-texto:#C2560C;
+  --neg-fundo:#FFC7CE;--neg-texto:#9C0006;--ok-fundo:#dcfce7;--ok-texto:#166534;
+  --atencao-fundo:#ffedd5;--atencao-borda:#f59e0b;--atencao-texto:#9a3412;
+  --agua-fundo:#e0f2fe;--agua-texto:#075985;--esgoto-fundo:#ede9fe;--esgoto-texto:#5b21b6;--info-fundo:#e0e7ff;--info-texto:#3730a3;
+  --graf-anterior:#A7B5CB;--graf-atual:#1A2740;--graf-alerta:#E8710A;--op-trilho:#DCE6EE;--barra-clara:#176b9c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif;font-size:14px}
+button{font:inherit;cursor:pointer}
+/* cabeçalho */
+.topo{background:linear-gradient(135deg,#0b2447 0%,#14375e 60%,#1b4a76 100%);color:#fff;padding:14px 16px 12px}
+.l1{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.l1 .tit{flex:1;min-width:240px}
+.selo{color:#9fe1e7;font-size:11px;letter-spacing:.1em;font-weight:600}
+.versao{display:inline-block;margin-left:6px;padding:0 6px;border-radius:10px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:10px}
+.topo h1{margin:4px 0 2px;font-size:20px}
+.status{color:#bfe0eb;font-size:12px}
+.acoes{display:flex;gap:6px;position:relative}
+.btn-top{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:7px 12px}
+.btn-top:hover:not(:disabled){background:rgba(255,255,255,.22)}
+.btn-top:disabled{opacity:.5;cursor:default}
+.menu{position:absolute;right:0;top:38px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(16,40,64,.18);min-width:220px;z-index:30;padding:4px}
+.menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;color:var(--ink)}
+.menu button:hover{background:#f2f8fc}
+.l2{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
+.f label{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#c8d6e5;margin-bottom:3px}
+.f select,.f .multi>button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:6px 8px;min-width:130px;text-align:left}
+.f select option{color:var(--ink)}
+.multi{position:relative}
+.multi .pop{position:absolute;top:34px;left:0;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px;max-height:280px;overflow:auto;min-width:220px;z-index:30;box-shadow:0 8px 24px rgba(16,40,64,.18)}
+.multi .pop label{display:flex;gap:6px;align-items:center;padding:4px 6px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink);cursor:pointer;margin:0}
+.multi .pop label:hover{background:#f2f8fc}
+.chk{display:flex;gap:6px;align-items:center;color:#c8d6e5;font-size:12px;padding-bottom:6px}
+.limpar{margin-left:auto;color:#fff;text-decoration:underline;font-size:12px;background:none;border:0;padding-bottom:6px}
+/* abas */
+.abas{display:flex;gap:2px;background:#fff;border-bottom:1px solid var(--line);padding:0 16px;overflow-x:auto}
+.abas button{background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:12px 14px;font-weight:600;white-space:nowrap}
+.abas button.on{color:var(--blue);border-bottom-color:var(--cyan)}
+main{padding:16px;max-width:1560px;margin:auto}
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-top:3px solid var(--marinho);border-radius:8px;padding:10px 12px}
+.kpi span{display:block;font-size:11px;color:var(--azul-claro);text-transform:uppercase;letter-spacing:.04em}
+.kpi b{font-size:22px;color:var(--preto)}
+.kpi small{display:block;color:var(--muted);font-size:11px}
+.kpi.alerta{border-top-color:var(--laranja)}
+/* cartões */
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;min-width:0}
+.card-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.card-h h2{margin:0;font-size:15px;color:var(--marinho)}
+.card-h .dir{margin-left:auto;display:flex;gap:6px;align-items:center}
+.btn{background:#fff;border:1px solid var(--line);color:var(--blue);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600}
+.btn:hover{background:#f2f8fc}
+.btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.pri:hover{background:var(--blue)}
+.busca{padding:5px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;min-width:180px}
+.help{position:relative;display:inline-flex;width:17px;height:17px;border-radius:50%;background:var(--tint);color:var(--azul);font-size:11px;font-weight:700;align-items:center;justify-content:center;cursor:help}
+.help .tip{display:none;position:absolute;left:22px;top:-6px;width:300px;background:var(--marinho);color:#fff;font-weight:400;font-size:12px;line-height:1.45;padding:8px 10px;border-radius:6px;border:1px solid var(--azul);z-index:40;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.help:hover .tip{display:block}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:960px){.duas{grid-template-columns:1fr}.l2 .limpar{margin-left:0}}
+/* tabelas */
+.tw{overflow:auto;max-height:480px}
+table{width:100%;border-collapse:collapse;font-family:'IBM Plex Sans Condensed','Segoe UI',Arial,sans-serif;font-size:12.5px}
+th{background:var(--marinho);color:#fff;text-align:left;padding:7px 6px;position:sticky;top:0;white-space:nowrap;z-index:1;cursor:pointer}
+td{padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:nth-child(even) td{background:var(--zebra)}
+tbody tr:hover td{background:#f2f8fc}
+tr.tot td{background:var(--tint)!important;font-weight:700;position:sticky;bottom:0}
+td.n,th.n{text-align:right}
+td.lk{color:var(--blue);cursor:pointer;text-decoration:underline dotted}
+td.lk:hover{color:var(--navy)}
+.low{color:var(--laranja-texto);font-weight:600}
+td.ok{background:var(--ok-fundo)!important;color:var(--ok-texto);font-weight:600}
+.bar{height:6px;background:var(--op-trilho);border-radius:3px;min-width:70px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#16a5b8,#7ee0bc);border-radius:3px}
+.bar.alerta i{background:var(--laranja)}
+.tag{padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag.IND{background:var(--esgoto-fundo);color:var(--esgoto-texto)}
+.tag.PAD{background:var(--agua-fundo);color:var(--agua-texto)}
+.tag.SEM,.tag.info{background:var(--info-fundo);color:var(--info-texto)}
+.tag.ok{background:var(--ok-fundo);color:var(--ok-texto)}
+.tag.at{background:var(--atencao-fundo);color:var(--atencao-texto)}
+/* gráfico */
+svg text{font-family:'IBM Plex Sans Condensed',sans-serif;fill:#1f2d3d;font-size:11px}
+.leg{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:4px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+/* aba Dados */
+details{background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:10px}
+summary{padding:12px 14px;font-weight:600;color:var(--marinho);cursor:pointer}
+details>div{padding:0 14px 14px}
+.reporte{border:1px solid var(--line);border-radius:8px;padding:14px;background:#fff}
+.reporte h3{margin:0 0 2px;color:var(--marinho)}
+.reporte .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+.rec td label{margin-right:12px;cursor:pointer}
+ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
+.vazio{padding:40px 16px;text-align:center;color:var(--muted)}
+.vazio b{display:block;color:var(--marinho);font-size:17px;margin-bottom:6px}
+/* painel lateral e toast */
+.lateral{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:#fff;box-shadow:-8px 0 30px rgba(16,40,64,.2);z-index:50;transform:translateX(105%);transition:transform .2s;display:flex;flex-direction:column}
+.lateral.on{transform:none}
+.lateral header{background:var(--marinho);color:#fff;padding:12px 14px;display:flex;gap:8px;align-items:center}
+.lateral header h3{margin:0;font-size:15px;flex:1}
+.lateral header button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 10px}
+.lateral .corpo{overflow:auto;flex:1;padding:10px}
+.toast{position:fixed;right:16px;bottom:16px;background:var(--marinho);color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:60;max-width:360px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.toast.erro{background:#9a3412}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="l1">
+    <div class="tit">
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v8</span></div>
+      <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
+      <div class="status" id="status">Conecte a pasta com as planilhas.</div>
+    </div>
+    <div class="acoes">
+      <button id="btnConectar" class="btn-top">📁 Conectar pasta</button>
+      <button id="btnAtualizar" class="btn-top" disabled>↻ Atualizar</button>
+      <button id="btnMenu" class="btn-top">☰ Menu</button>
+      <div class="menu" id="menu" hidden>
+        <button data-m="csv-os">⬇ CSV · OS cruzadas com a base</button>
+        <button data-m="csv-ruas">⬇ CSV · Logradouros</button>
+        <button data-m="dados">Ir para a aba Dados</button>
+        <button data-m="cache">Limpar cache de leitura</button>
+      </div>
+    </div>
+  </div>
+  <div class="l2">
+    <div class="f"><label>Mês inicial</label><select id="fIni"></select></div>
+    <div class="f"><label>Mês final</label><select id="fFim"></select></div>
+    <div class="f"><label>Cidade</label><div class="multi" id="fCid"></div></div>
+    <div class="f"><label>Tipo de faturamento</label><div class="multi" id="fTipo"></div></div>
+    <label class="chk"><input type="checkbox" id="fNc"> Mostrar recursos não classificados</label>
+    <button class="limpar" id="limpar">Limpar filtros</button>
+  </div>
+</header>
+<input type="file" id="inputPasta" webkitdirectory directory multiple hidden>
+<nav class="abas" id="abas">
+  <button data-a="prod" class="on">Produtividade</button>
+  <button data-a="ruas">Logradouros</button>
+  <button data-a="dados">Dados</button>
+</nav>
+<main>
+  <section id="a-prod"></section>
+  <section id="a-ruas" hidden></section>
+  <section id="a-dados" hidden></section>
+</main>
+<aside class="lateral" id="lateral"><header><h3 id="latTit"></h3><button id="latCsv">⬇ CSV</button><button id="latX">✕</button></header><div class="corpo" id="latCorpo"></div></aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const VERSAO_SITE = "v8-20261112";
+const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
+const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
+document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
+
+/* ================= utilidades ================= */
+const $ = (id) => document.getElementById(id);
+const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (n) => (!n || !isFinite(n)) ? "-" : n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const pct = (n) => (!n || !isFinite(n)) ? "-" : (n * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const mesLongo = (ym) => ym ? `${MESES[+ym.slice(5, 7) - 1]}/${ym.slice(0, 4)}` : "Sem data";
+const mesCurto = (ym) => ym ? `${MESES[+ym.slice(5, 7) - 1].slice(0, 3)}/${ym.slice(2, 4)}` : "s/d";
+const dataBR = (iso) => iso ? iso.split("-").reverse().join("/") : "";
+const help = (t) => `<span class="help">?<span class="tip">${t}</span></span>`;
+let toastT;
+function toast(t, erro) { const el = $("toast"); el.textContent = t; el.className = "toast on" + (erro ? " erro" : ""); clearTimeout(toastT); toastT = setTimeout(() => el.className = "toast", 4500); }
+function baixaCSV(nome, cab, linhas) {
+  const q = (v) => { const s = String(v ?? ""); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const txt = "﻿" + [cab, ...linhas].map((l) => l.map(q).join(";")).join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" }));
+  a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ================= regras ================= */
+let REGRAS = { meta_produtividade: 0.7, prefixo_bases_geradas: "painel_esgoto_", classes_faturamento: { IND: "Fat. indireto esgoto (só água)", PAD: "Padronização (água + esgoto)", SEM: "Sem informação" } };
+const regrasProntas = fetch("pacote/regras.json?v=" + VERSAO_SITE).then((r) => r.json()).then((j) => REGRAS = j).catch(() => {});
+const CLS = () => REGRAS.classes_faturamento;
+let AJ = {}; try { AJ = JSON.parse(localStorage.getItem("regrasPainel") || "{}"); } catch (e) {}
+if (AJ.v !== 2) { delete AJ.impl; AJ.v = 2; if (Object.keys(AJ).length === 1) AJ = {}; }
+function RG() {
+  const o = REGRAS.os || {}, b = REGRAS.base || {};
+  return {
+    codigo: o.codigo_alvo || "SONDAGEM DE REDE DE ESGOTO",
+    status: AJ.status ?? o.status_executada ?? ["FINALIZADA", "ENCERRADA COM OCORRENCIA"],
+    impl: AJ.impl ?? o.implantacao ?? "",
+    meta: AJ.meta ?? REGRAS.meta_produtividade ?? 0.7,
+    pad: AJ.pad ?? b.faturamento_padronizacao_contem ?? "ESGOTO",
+    engNao: AJ.engNao ?? b.engenharia_valores_nao ?? [""],
+  };
+}
+// recalcula executada / implantação / classe de faturamento / engenharia com as regras efetivas
+function aplicaRegras(os, base) {
+  const R = RG(), st = new Set(R.status.map(norm)), im = norm(R.impl), pad = norm(R.pad), nao = new Set(R.engNao.map(norm));
+  for (const r of os) { r.e = st.has(norm(r.s)); r.i = r.e && (r.ad !== undefined ? norm(r.ad).includes(im) : r.i); }
+  for (const b of base.values()) {
+    if (b.fr !== undefined) b.f = !norm(b.fr) ? "SEM" : norm(b.fr).includes(pad) ? "PAD" : "IND";
+    if (b.engv !== undefined) b.eng = !nao.has(norm(b.engv));
+  }
+}
+
+/* ================= IndexedDB ================= */
+function banco() {
+  return new Promise((ok, erro) => {
+    const r = indexedDB.open("PAINEL_ESGOTO_pasta", 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore("pasta"); r.result.createObjectStore("cache"); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => erro(r.error);
+  });
+}
+async function dbPut(store, k, v) { try { const db = await banco(); await new Promise((ok) => { const t = db.transaction(store, "readwrite"); t.objectStore(store).put(v, k); t.oncomplete = ok; t.onerror = ok; }); } catch (e) {} }
+async function dbGet(store, k) { try { const db = await banco(); return await new Promise((ok) => { const r = db.transaction(store).objectStore(store).get(k); r.onsuccess = () => ok(r.result ?? null); r.onerror = () => ok(null); }); } catch (e) { return null; } }
+async function dbLimpa(store) { try { const db = await banco(); await new Promise((ok) => { const t = db.transaction(store, "readwrite"); t.objectStore(store).clear(); t.oncomplete = ok; }); } catch (e) {} }
+
+/* ================= pasta ================= */
+let pastaHandle = null;
+async function arquivosDaPasta(handle, prefixo = "") {
+  const lista = [];
+  for await (const [nome, item] of handle.entries()) {
+    if (item.kind === "directory") lista.push(...await arquivosDaPasta(item, prefixo + nome + "/"));
+    else if (EXT.test(nome) && !nome.startsWith("~$")) {
+      const f = await item.getFile();
+      lista.push({ nome: prefixo + nome, arquivo: f, tamanho: f.size, modificado: f.lastModified });
+    }
+  }
+  return lista;
+}
+async function lePasta() {
+  if ((await pastaHandle.queryPermission({ mode: "read" })) !== "granted"
+      && (await pastaHandle.requestPermission({ mode: "read" })) !== "granted") return;
+  $("btnAtualizar").disabled = false;
+  analisa(await arquivosDaPasta(pastaHandle));
+}
+async function conecta() {
+  if ("showDirectoryPicker" in window) {
+    try { pastaHandle = await showDirectoryPicker({ id: "painel_esgoto", mode: "read" }); } catch (e) { return; }
+    dbPut("pasta", "atual", pastaHandle); lePasta();
+  } else $("inputPasta").click();
+}
+$("btnConectar").onclick = conecta;
+$("btnAtualizar").onclick = () => pastaHandle && lePasta();
+$("inputPasta").onchange = (e) => {
+  const arquivos = [...e.target.files].filter((f) => EXT.test(f.name) && !f.name.startsWith("~$"))
+    .map((f) => ({ nome: (f.webkitRelativePath || f.name).split("/").slice(1).join("/") || f.name, arquivo: f, tamanho: f.size, modificado: f.lastModified }));
+  analisa(arquivos); e.target.value = "";
+};
+
+/* ================= worker / análise ================= */
+const worker = new Worker("analisador.worker.js?v=" + VERSAO_SITE);
+let pendente = null;
+worker.onmessage = (e) => {
+  const m = e.data;
+  if (m.tipo === "status") $("status").textContent = m.texto;
+  else if (m.tipo === "arquivo" && pendente) { pendente.res.set(m.chave, m.dados); dbPut("cache", m.chave, m.dados); }
+  else if (m.tipo === "fim" && pendente) { const p = pendente; pendente = null; conclui(p); }
+  else if (m.tipo === "erro") { pendente = null; $("status").textContent = "Erro na leitura"; toast("Erro ao ler as planilhas: " + m.texto, true); }
+};
+async function analisa(arquivos) {
+  await regrasProntas;
+  const pref = norm(REGRAS.prefixo_bases_geradas);
+  const ignorados = [];
+  const usar = arquivos.filter((a) => { const b = norm(a.nome.split("/").pop()); if (b.startsWith(pref)) { ignorados.push({ arquivo: a.nome, tipo: "nao_usado", motivo: "base gerada pelo próprio painel", linhas: 0, registros: [] }); return false; } return true; });
+  if (!usar.length) { toast("Nenhuma planilha (.xlsx, .xlsm, .xls, .csv) encontrada na pasta.", true); return; }
+  const res = new Map(), falta = [];
+  for (const a of usar) {
+    a.chave = `${a.nome}|${a.tamanho}|${a.modificado}|${BASE}|${REGRAS.versao_leitura ?? 1}`;
+    const c = await dbGet("cache", a.chave);
+    if (c) res.set(a.chave, c); else falta.push(a);
+  }
+  pendente = { res, ordem: usar, ignorados, novos: falta.length };
+  $("status").textContent = falta.length ? `Lendo ${falta.length} arquivo(s)… (${usar.length - falta.length} do cache)` : "Usando cache…";
+  if (falta.length) worker.postMessage({ fase: "analisar", arquivos: falta.map(({ nome, arquivo, chave }) => ({ nome, arquivo, chave })) });
+  else conclui(pendente), pendente = null;
+}
+function conclui(p) {
+  const arqs = [...p.ordem.map((a) => ({ ...p.res.get(a.chave), modificado: a.modificado, tamanho: a.tamanho })), ...p.ignorados];
+  const ultima = { quando: Date.now(), arquivos: arqs };
+  dbPut("cache", "__ultima__", ultima);
+  monta(ultima);
+  toast(`Painel atualizado — ${p.ordem.length} arquivo(s) lidos` + (p.novos < p.ordem.length ? ` (${p.ordem.length - p.novos} do cache)` : ""));
+}
+
+/* ================= dados combinados ================= */
+let D = null;                                  // { os:[], base:Map, arquivos:[], quando }
+let SEL = {}; try { SEL = JSON.parse(localStorage.getItem("selRecursos") || "{}"); } catch (e) {}
+const grupo = (r) => SEL[norm(r)] || "nc";
+const GN = { eng: "Engenharia", srv: "Serviços", nc: "Não classificado" };
+function monta(ultima) {
+  const base = new Map(); const os = []; const vistos = new Set(); let dup = 0;
+  for (const a of ultima.arquivos) {
+    if (a.tipo === "base") for (const r of a.registros) base.set(r.m, r);
+    if (a.tipo === "os") for (const r of a.registros) {
+      const k = r.id ? "id:" + r.id : [r.r, r.m, r.d, r.s].join("|");
+      if (vistos.has(k)) { dup++; continue; } vistos.add(k); os.push(r);
+    }
+  }
+  aplicaRegras(os, base);
+  const porMat = new Map();
+  for (const r of os) { r.B = base.get(r.m) || null; r.mes = (r.d || "").slice(0, 7); if (r.m) { const l = porMat.get(r.m) || []; l.push(r); porMat.set(r.m, l); } }
+  D = { os, base, porMat, arquivos: ultima.arquivos, quando: ultima.quando, dup };
+  montaFiltros(); desenha();
+  $("status").textContent = `Última leitura: ${new Date(ultima.quando).toLocaleString("pt-BR")} · ${num(os.length)} OS de sondagem · ${num(base.size)} ligações na base`;
+}
+
+/* ================= filtros ================= */
+const F = { ini: "", fim: "", cid: new Set(), tipo: new Set(), nc: false };
+function multi(el, opcoes, set, rotTodos) {
+  const txt = () => set.size === 0 ? rotTodos : set.size === 1 ? [...set][0] : `${set.size} selecionados`;
+  el.innerHTML = `<button type="button">${esc(txt())} ▾</button><div class="pop" hidden>${opcoes.map(([v, l]) => `<label><input type="checkbox" value="${esc(v)}" ${set.has(v) ? "checked" : ""}> ${esc(l)}</label>`).join("") || "<i>Sem opções</i>"}</div>`;
+  const pop = el.querySelector(".pop"), b = el.querySelector("button");
+  b.onclick = (e) => { e.stopPropagation(); document.querySelectorAll(".multi .pop").forEach((p) => p !== pop && (p.hidden = true)); pop.hidden = !pop.hidden; };
+  pop.onclick = (e) => e.stopPropagation();
+  pop.onchange = (e) => { e.target.checked ? set.add(e.target.value) : set.delete(e.target.value); b.textContent = txt() + " ▾"; desenha(); };
+}
+document.addEventListener("click", () => { document.querySelectorAll(".multi .pop").forEach((p) => p.hidden = true); $("menu").hidden = true; });
+function montaFiltros() {
+  const meses = [...new Set(D.os.map((r) => r.mes).filter(Boolean))].sort();
+  const opt = (sel) => `<option value="">Todos</option>` + meses.map((m) => `<option value="${m}" ${m === sel ? "selected" : ""}>${mesLongo(m)}</option>`).join("");
+  $("fIni").innerHTML = opt(F.ini); $("fFim").innerHTML = opt(F.fim);
+  const cids = [...new Set([...D.os.map((r) => r.c || r.B?.c), ...[...D.base.values()].map((b) => b.c)].filter(Boolean).map((c) => c.trim()))].sort();
+  multi($("fCid"), cids.map((c) => [c, c]), F.cid, "Todas");
+  multi($("fTipo"), Object.entries(CLS()), F.tipo, "Todos");
+}
+$("fIni").onchange = (e) => { F.ini = e.target.value; desenha(); };
+$("fFim").onchange = (e) => { F.fim = e.target.value; desenha(); };
+$("fNc").onchange = (e) => { F.nc = e.target.checked; desenha(); };
+$("limpar").onclick = () => { F.ini = F.fim = ""; F.cid.clear(); F.tipo.clear(); F.nc = false; $("fNc").checked = false; if (D) { montaFiltros(); desenha(); } };
+const cidOk = (c) => !F.cid.size || F.cid.has((c || "").trim());
+const tipoOk = (f) => !F.tipo.size || F.tipo.has(f || "SEM");
+const osFiltradas = () => D.os.filter((r) => (!F.ini || r.mes >= F.ini) && (!F.fim || r.mes <= F.fim) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
+const baseFiltrada = () => [...D.base.values()].filter((b) => cidOk(b.c) && tipoOk(b.f));
+
+/* ================= abas ================= */
+let ABA = "prod";
+$("abas").onclick = (e) => { const a = e.target.dataset.a; if (!a) return; ABA = a; document.querySelectorAll("#abas button").forEach((b) => b.classList.toggle("on", b.dataset.a === a)); ["prod", "ruas", "dados"].forEach((x) => $("a-" + x).hidden = x !== a); desenha(); };
+$("btnMenu").onclick = (e) => { e.stopPropagation(); $("menu").hidden = !$("menu").hidden; };
+$("menu").onclick = async (e) => {
+  const m = e.target.dataset.m; if (!m) return; $("menu").hidden = true;
+  if (m === "dados") document.querySelector('#abas [data-a="dados"]').click();
+  if (m === "cache") { await dbLimpa("cache"); toast("Cache de leitura limpo. Clique em ↻ Atualizar."); }
+  if (!D) return toast("Conecte a pasta primeiro.", true);
+  if (m === "csv-os") csvOS();
+  if (m === "csv-ruas") csvRuas();
+};
+
+/* ================= painel lateral ================= */
+let LAT = null;
+function abreLateral(titulo, linhas) {
+  LAT = { titulo, linhas };
+  $("latTit").textContent = `${titulo} (${linhas.length.toLocaleString("pt-BR")})`;
+  $("latCorpo").innerHTML = `<table><thead><tr><th>Matrícula</th><th>Cliente</th><th>Logradouro</th><th>Fat.</th><th>Situação</th></tr></thead><tbody>${linhas.slice(0, 3000).map((l) => `<tr><td>${esc(l.m)}</td><td>${esc(l.cl)}</td><td>${esc(l.rua)}</td><td>${l.f ? `<span class="tag ${l.f}">${l.f === "IND" ? "Fat. ind." : l.f === "PAD" ? "Padron." : "s/ info"}</span>` : ""}</td><td>${esc(l.sit)}</td></tr>`).join("")}</tbody></table>${linhas.length > 3000 ? "<p>Mostrando 3.000. Baixe o CSV para ver tudo.</p>" : ""}`;
+  $("lateral").classList.add("on");
+}
+const fechaLateral = () => $("lateral").classList.remove("on");
+$("latX").onclick = fechaLateral;
+document.addEventListener("keydown", (e) => e.key === "Escape" && fechaLateral());
+document.addEventListener("mousedown", (e) => { if ($("lateral").classList.contains("on") && !$("lateral").contains(e.target) && !e.target.closest(".lk")) fechaLateral(); });
+$("latCsv").onclick = () => LAT && baixaCSV(`painel_esgoto_lista.csv`, CAB_DET, LAT.linhas.map((l) => l.base ? linhaDet(l.base, l.sit) : linhaDet({ m: l.m, cl: l.cl, rua: l.rua, f: l.f, fr: l.fr, sit: "", b: "", c: "" }, l.sit)));
+const linhaOS = (r) => ({ m: r.m, cl: r.B?.cl || r.cl, rua: r.B?.rua || r.en, f: r.B?.f || "", fr: r.B?.fr || "", sit: `${r.s} · ${dataBR(r.d)} · ${r.r}` });
+const linhaBase = (b, sit) => ({ m: b.m, cl: b.cl, rua: b.rua, f: b.f, fr: b.fr, sit, base: b });
+const CLIQUES = new Map(); let nClique = 0;
+const lk = (n, titulo, fn) => { if (!n) return `<td class="n">-</td>`; const id = "c" + (nClique++); CLIQUES.set(id, () => abreLateral(titulo, fn())); return `<td class="n lk" data-c="${id}">${num(n)}</td>`; };
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-c]"); if (t && CLIQUES.has(t.dataset.c)) CLIQUES.get(t.dataset.c)(); });
+
+/* ================= cálculos ================= */
+function porGrupo(L) {
+  const G = {};
+  for (const r of L) {
+    const g = grupo(r.r); if (g === "nc" && !F.nc) continue;
+    const o = G[g] ||= { rec: new Map(), L: [] }; o.L.push(r);
+    const x = o.rec.get(r.r) || { nome: r.r, L: [] }; x.L.push(r); o.rec.set(r.r, x);
+  }
+  return G;
+}
+const resumo = (L) => { const ex = L.filter((r) => r.e), im = ex.filter((r) => r.i); const dias = new Set(L.map((r) => r.d).filter(Boolean)).size, eqDias = new Set(L.filter((r) => r.d).map((r) => r.r + "|" + r.d)).size; return { dias, eqDias, vis: L.length, ex: ex.length, im: im.length, ind: im.filter((r) => r.B?.f === "IND").length, pad: im.filter((r) => r.B?.f === "PAD").length, prod: L.length ? ex.length / L.length : 0, exL: ex, imL: im }; };
+function situacaoRuas() {
+  // matrícula feita = engenharia marcada na base OU OS executada com implantação (todo o período)
+  const feito = new Map();
+  for (const r of D.os) if (r.e && r.i && r.m) { const g = grupo(r.r); if (!feito.has(r.m) || g === "eng") feito.set(r.m, g === "eng" ? "eng" : "srv"); }
+  const R = new Map();
+  for (const b of baseFiltrada()) {
+    const k = b.rua + "|" + (b.c || ""); const o = R.get(k) || { rua: b.rua, bairro: b.b, cid: b.c, L: [], ind: 0, pad: 0, engB: [], engO: [], srv: [], falta: [] };
+    o.L.push(b); if (b.f === "IND") o.ind++; if (b.f === "PAD") o.pad++;
+    if (b.eng) o.engB.push(b); else if (feito.get(b.m) === "eng") o.engO.push(b); else if (feito.has(b.m)) o.srv.push(b); else o.falta.push(b);
+    R.set(k, o);
+  }
+  return [...R.values()].map((o) => ({ ...o, tot: o.L.length, feitas: o.engB.length + o.engO.length + o.srv.length, faltaInd: o.falta.filter((b) => b.f === "IND").length })).sort((a, b) => b.falta.length - a.falta.length);
+}
+
+/* ================= desenho ================= */
+function vazio() { return `<div class="card vazio"><b>Nenhum dado carregado</b>Clique em 📁 Conectar pasta e escolha a pasta com a planilha de OS executadas e a base de ligações.</div>`; }
+function desenha() {
+  CLIQUES.clear(); nClique = 0;
+  if (D) { const p = [F.ini, F.fim].some(Boolean) ? ` — ${F.ini ? mesLongo(F.ini) : "início"} a ${F.fim ? mesLongo(F.fim) : "hoje"}` : ""; $("titulo").textContent = "Produtividade · Execução de Esgoto" + p; }
+  if (ABA === "prod") $("a-prod").innerHTML = D ? abaProd() : vazio();
+  if (ABA === "ruas") { $("a-ruas").innerHTML = D ? abaRuas() : vazio(); ligaBuscaRuas(); }
+  if (ABA === "dados") { $("a-dados").innerHTML = abaDados(); ligaDados(); }
+}
+function kpi(rot, val, sub = "", alerta = false) { return `<div class="kpi ${alerta ? "alerta" : ""}"><span>${rot}</span><b class="${alerta ? "low" : ""}">${val}</b>${sub ? `<small>${sub}</small>` : ""}</div>`; }
+
+function abaProd() {
+  const L = osFiltradas(), G = porGrupo(L), meta = RG().meta;
+  const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo);
+  const eq = (g) => G[g] ? [...G[g].rec.values()].length : 0;
+  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Produtividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
+  const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
+  h += `<div class="duas">${cards.join("")}</div>`;
+  h += cardGrafMes(L);
+  return h;
+}
+function cardGrupo(g, o) {
+  const meta = RG().meta;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
+  const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex);
+  const T = resumo(o.L);
+  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}</tr>`;
+  return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Produtividade", pct(T.prod), "", T.prod < meta)}${kpi("Exec./equipe", num(T.ex / recs.length))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}</div>
+  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n">Prod.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
+}
+function barras(meses, series, alt = 220) {
+  const W = Math.max(520, meses.length * 70), H = alt, pad = { l: 36, b: 28, t: 18, r: 8 };
+  const max = Math.max(4, Math.ceil(Math.max(...series.flatMap((s) => s.v)) / 4) * 4); const bw = (W - pad.l - pad.r) / meses.length; const w = Math.min(26, (bw - 10) / series.length);
+  let g = "";
+  for (let i = 0; i <= 4; i++) { const y = pad.t + (H - pad.t - pad.b) * (1 - i / 4); g += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y}" y2="${y}" stroke="#dbe4ec"/><text x="${pad.l - 4}" y="${y + 4}" text-anchor="end">${(max * i / 4).toLocaleString("pt-BR")}</text>`; }
+  meses.forEach((m, i) => {
+    const x0 = pad.l + bw * i + (bw - w * series.length) / 2;
+    series.forEach((s, j) => { const v = s.v[i], h = (H - pad.t - pad.b) * v / max, y = H - pad.b - h; g += `<rect x="${x0 + j * w}" y="${y}" width="${w - 2}" height="${h}" fill="${s.cor}" rx="2"><title>${s.nome} · ${mesLongo(m)}: ${num(v)}</title></rect>${v ? `<text x="${x0 + j * w + (w - 2) / 2}" y="${y - 3}" text-anchor="middle">${num(v)}</text>` : ""}`; });
+    g += `<text x="${pad.l + bw * i + bw / 2}" y="${H - 8}" text-anchor="middle">${mesCurto(m)}</text>`;
+  });
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${Math.min(W, 520)}px;max-height:${H + 40}px" role="img">${g}</svg></div><div class="leg">${series.map((s) => `<span><i style="background:${s.cor}"></i>${s.nome}</span>`).join("")}</div>`;
+}
+function cardGrafMes(L) {
+  const meses = [...new Set(L.map((r) => r.mes).filter(Boolean))].sort();
+  if (!meses.length) return "";
+  const conta = (g) => meses.map((m) => L.filter((r) => r.mes === m && r.e && grupo(r.r) === g).length);
+  return `<div class="card"><div class="card-h"><h2>Executadas por mês</h2>${help("Quantidade de OS executadas (Finalizada + Encerrada com Ocorrência) em cada mês, separadas por Engenharia e Serviços.")}</div>${barras(meses, [{ nome: "Engenharia", cor: "#1A2740", v: conta("eng") }, { nome: "Serviços", cor: "#176b9c", v: conta("srv") }])}</div>`;
+}
+
+let BUSCA_RUA = "";
+function abaRuas() {
+  const R = situacaoRuas(); const t = R.reduce((s, r) => (s.tot += r.tot, s.f += r.feitas, s.fa += r.falta.length, s.fi += r.faltaInd, s.c += r.falta.length === 0 ? 1 : 0, s), { tot: 0, f: 0, fa: 0, fi: 0, c: 0 });
+  let h = `<div class="kpis">${kpi("Logradouros", num(R.length))}${kpi("Ligações na base", num(t.tot))}${kpi("Feitas", num(t.f))}${kpi("Faltam", num(t.fa), "", t.fa > 0)}${kpi("% concluído", pct(t.f / t.tot))}${kpi("Ruas concluídas", num(t.c))}${kpi("Previsão fat. indireto", num(t.fi), "faltam e só pagam água")}</div>`;
+  h += `<div class="card"><div class="card-h"><h2>Execução por logradouro</h2>${help("Cruza a Matrícula das OS com o NUM_LIGACAO da base. Feita = coluna Engenharia execução preenchida na base, ou OS executada com implantação de ligação (todo o período, sem o filtro de mês). Fat. indireto = TIPO_FATURAMENTO só água (ligação nova gera receita de esgoto). Padronização = já fatura água e esgoto. Clique num número para ver os clientes.")}<div class="dir"><input class="busca" id="bRua" placeholder="Buscar logradouro…" value="${esc(BUSCA_RUA)}"><button class="btn" data-m2="csv-ruas">⬇ CSV</button></div></div>
+  <div class="tw" style="max-height:600px"><table id="tRuas"><thead><tr><th>Logradouro</th><th>Bairro</th><th>Cidade</th><th class="n">Ligações</th><th class="n">Fat. ind.</th><th class="n">Padron.</th><th class="n">Eng. (base)</th><th class="n">Eng. (OS)</th><th class="n">Serviços</th><th class="n">Feitas</th><th class="n">Faltam</th><th class="n">Faltam fat. ind.</th><th>% concluído</th></tr></thead><tbody>
+  ${R.map((r) => { const p = r.tot ? r.feitas / r.tot : 0; const n = r.rua; return `<tr data-rua="${esc(norm(r.rua))}"><td>${esc(r.rua)}</td><td>${esc(r.bairro)}</td><td>${esc(r.cid)}</td>${lk(r.tot, n + " · ligações", () => r.L.map((b) => linhaBase(b, b.sit)))}${lk(r.ind, n + " · fat. indireto", () => r.L.filter((b) => b.f === "IND").map((b) => linhaBase(b, b.sit)))}${lk(r.pad, n + " · padronização", () => r.L.filter((b) => b.f === "PAD").map((b) => linhaBase(b, b.sit)))}${lk(r.engB.length, n + " · engenharia (base)", () => r.engB.map((b) => linhaBase(b, "Engenharia (base)")))}${lk(r.engO.length, n + " · engenharia (OS)", () => r.engO.map((b) => linhaBase(b, "Engenharia (OS)")))}${lk(r.srv.length, n + " · serviços", () => r.srv.map((b) => linhaBase(b, "Serviços (OS)")))}${lk(r.feitas, n + " · feitas", () => [...r.engB, ...r.engO, ...r.srv].map((b) => linhaBase(b, "Feita")))}${r.falta.length ? lk(r.falta.length, n + " · faltam", () => r.falta.map((b) => linhaBase(b, "Falta"))).replace('class="n lk"', 'class="n lk low"') : `<td class="n ok">-</td>`}${lk(r.faltaInd, n + " · faltam (fat. indireto)", () => r.falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")))}<td><div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div> ${pct(p)}</td></tr>`; }).join("")}
+  </tbody><tfoot><tr class="tot"><td>Total</td><td></td><td></td>${totRuas(R)}<td>${pct(t.f / t.tot)}</td></tr></tfoot></table></div></div>`;
+  const top = R.filter((r) => r.falta.length).slice(0, 15);
+  if (top.length) h += `<div class="card"><div class="card-h"><h2>Logradouros com mais ligações faltando</h2>${help("As 15 ruas com mais ligações ainda sem execução. Marinho = feitas, laranja = faltam.")}</div>${barrasH(top)}</div>`;
+  return h;
+}
+function totRuas(R) {
+  const all = (fn) => R.flatMap(fn), T = "Todos os logradouros";
+  const sb = (b) => b.sit, ind = all((r) => r.L.filter((b) => b.f === "IND")), pad = all((r) => r.L.filter((b) => b.f === "PAD"));
+  const engB = all((r) => r.engB), engO = all((r) => r.engO), srv = all((r) => r.srv), falta = all((r) => r.falta);
+  return lk(R.reduce((s, r) => s + r.tot, 0), T + " · ligações", () => all((r) => r.L).map((b) => linhaBase(b, sb(b))))
+    + lk(ind.length, T + " · fat. indireto", () => ind.map((b) => linhaBase(b, sb(b))))
+    + lk(pad.length, T + " · padronização", () => pad.map((b) => linhaBase(b, sb(b))))
+    + lk(engB.length, T + " · engenharia (base)", () => engB.map((b) => linhaBase(b, "Engenharia (base)")))
+    + lk(engO.length, T + " · engenharia (OS)", () => engO.map((b) => linhaBase(b, "Engenharia (OS)")))
+    + lk(srv.length, T + " · serviços", () => srv.map((b) => linhaBase(b, "Serviços (OS)")))
+    + lk(engB.length + engO.length + srv.length, T + " · feitas", () => [...engB.map((b) => linhaBase(b, "Engenharia (base)")), ...engO.map((b) => linhaBase(b, "Engenharia (OS)")), ...srv.map((b) => linhaBase(b, "Serviços (OS)"))])
+    + lk(falta.length, T + " · faltam", () => falta.map((b) => linhaBase(b, "Falta")))
+    + lk(falta.filter((b) => b.f === "IND").length, T + " · faltam (fat. indireto)", () => falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")));
+}
+function barrasH(R) {
+  const W = 760, lh = 24, lx = 230, H = R.length * lh + 10, max = Math.max(...R.map((r) => r.tot));
+  const g = R.map((r, i) => { const y = 5 + i * lh, wf = (W - lx - 60) * r.feitas / max, wa = (W - lx - 60) * r.falta.length / max;
+    return `<text x="${lx - 6}" y="${y + 15}" text-anchor="end">${esc(r.rua.slice(0, 34))}</text><rect x="${lx}" y="${y + 4}" width="${wf}" height="14" fill="#1A2740"/><rect x="${lx + wf}" y="${y + 4}" width="${wa}" height="14" fill="#E8710A"><title>Faltam ${r.falta.length}</title></rect><text x="${lx + wf + wa + 4}" y="${y + 15}">${num(r.falta.length)}</text>`; }).join("");
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${g}</svg></div><div class="leg"><span><i style="background:#1A2740"></i>Feitas</span><span><i style="background:#E8710A"></i>Faltam</span></div>`;
+}
+function ligaBuscaRuas() {
+  const b = $("bRua"); if (!b) return;
+  const aplica = () => { const q = norm(b.value); BUSCA_RUA = b.value; document.querySelectorAll("#tRuas tbody tr").forEach((tr) => tr.hidden = !tr.dataset.rua.includes(q)); };
+  b.oninput = aplica; aplica();
+}
+document.addEventListener("click", (e) => {
+  if (e.target.dataset.m2 === "csv-ruas") csvRuas();
+  const g = e.target.dataset.csvg; if (g && D) { const L = osFiltradas().filter((r) => grupo(r.r) === g); baixaCSV(`painel_esgoto_${g}.csv`, ["Recurso", "Data", "Matrícula", "Status", "Executada", "Implantação", "Logradouro", "Tipo faturamento"], L.map((r) => [r.r, dataBR(r.d), r.m, r.s, r.e ? "Sim" : "Não", r.i ? "Sim" : "Não", r.B?.rua || "", r.B?.fr || ""])); }
+});
+// OS que representa a ligação: a última executada com implantação; senão a última executada; senão a última visita
+function osDaLigacao(m) {
+  const L = (D.porMat.get(m) || []).slice().sort((a, b) => (b.d || "").localeCompare(a.d || ""));
+  return L.find((r) => r.e && r.i) || L.find((r) => r.e) || L[0] || null;
+}
+const CAB_DET = ["Logradouro", "Bairro", "Cidade (base)", "Matrícula", "Cliente (base)", "Situação na rua", "Tipo faturamento", "Classe faturamento", "SIT_LIG", "SUB_CATEGORIA", "TOTAL_ECO", "Engenharia execução",
+  "Nº da OS", "Recurso", "Grupo", "Código/Descrição", "Data", "Data de execução (Fim)", "Status da Atividade", "Executada", "Implantação", "Nome do Solicitante", "Cidade (OS)", "Serviço adicionais resposta", "Qtd. OS da matrícula"];
+function linhaDet(b, situacao) {
+  const o = osDaLigacao(b.m), n = (D.porMat.get(b.m) || []).length;
+  return [b.rua, b.b, b.c, b.m, b.cl, situacao, b.fr, CLS()[b.f] || "", b.sit, b.sub ?? "", b.eco ?? "", b.engv ?? "",
+    o?.id || "", o?.r || "", o ? GN[grupo(o.r)] : "", o?.cod || "", dataBR(o?.d), o?.fim || "", o?.s || "", o ? (o.e ? "Sim" : "Não") : "", o ? (o.i ? "Sim" : "Não") : "", o?.cl || "", o?.c || "", o?.ad || "", n || ""];
+}
+function situacaoLig(r, b) { return r.engB.includes(b) ? "Feita · Engenharia (base)" : r.engO.includes(b) ? "Feita · Engenharia (OS)" : r.srv.includes(b) ? "Feita · Serviços (OS)" : "Falta"; }
+function csvRuas() {
+  const q = norm(BUSCA_RUA), linhas = [];
+  for (const r of situacaoRuas()) { if (q && !norm(r.rua).includes(q)) continue; for (const b of r.L) linhas.push(linhaDet(b, situacaoLig(r, b))); }
+  baixaCSV("painel_esgoto_logradouros_detalhado.csv", CAB_DET, linhas);
+}
+function csvOS() { baixaCSV("painel_esgoto_os_cruzadas.csv", ["Recurso", "Grupo", "Data", "Matrícula", "Status", "Executada", "Implantação", "Na base?", "Logradouro", "Bairro", "Cidade", "Tipo faturamento", "Classe"], osFiltradas().map((r) => [r.r, GN[grupo(r.r)], dataBR(r.d), r.m, r.s, r.e ? "Sim" : "Não", r.i ? "Sim" : "Não", r.B ? "Sim" : "Não", r.B?.rua || "", r.B?.b || r.b, r.B?.c || r.c, r.B?.fr || "", r.B ? CLS()[r.B.f] : ""])); }
+
+/* ================= aba Dados ================= */
+let BUSCA_REC = "";
+function recursos() { const m = new Map(); if (D) for (const r of D.os) { if (!r.r) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
+function reporte() {
+  if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
+  const fim = D.os.map((r) => r.d).filter(Boolean).sort().pop(); const dI = new Date(fim + "T00:00:00"); dI.setDate(dI.getDate() - 6); const ini = dI.toISOString().slice(0, 10);
+  const L = D.os.filter((r) => r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
+  const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.eqDias)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
+  const ruas = situacaoRuas().filter((r) => r.falta.length).slice(0, 5);
+  return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
+  <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Equipe-dia</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implantação</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
+  ${ruas.length ? `<h4 style="margin:12px 0 4px;color:#394D73">Ruas com mais ligações faltando</h4><table><thead><tr><th>Logradouro</th><th class="n">Ligações</th><th class="n">Feitas</th><th class="n">Faltam</th></tr></thead><tbody>${ruas.map((r) => `<tr><td>${esc(r.rua)}</td><td class="n">${num(r.tot)}</td><td class="n">${num(r.feitas)}</td><td class="n low">${num(r.falta.length)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`;
+}
+function abaDados() {
+  const arqs = D?.arquivos || [];
+  const semBase = D ? D.os.filter((r) => !r.B) : [];
+  const recs = recursos(); const nc = recs.filter((r) => grupo(r.n) === "nc");
+  const naoUsados = arqs.filter((a) => a.tipo === "nao_usado");
+  const ausentes = arqs.filter((a) => a.info?.colunas_ausentes?.length);
+  const avisos = [
+    !D && "Nenhuma pasta lida ainda.",
+    D && !arqs.some((a) => a.tipo === "os") && "Nenhuma planilha de OS executadas reconhecida.",
+    D && !arqs.some((a) => a.tipo === "base") && "Nenhuma base de ligações reconhecida.",
+    nc.length && `${nc.length} recurso(s) sem grupo (Engenharia/Serviços) — marque abaixo em Recursos.`,
+    semBase.length && `${num(semBase.length)} OS com matrícula que não está na base.`,
+    D?.dup && `${num(D.dup)} OS repetidas entre arquivos foram descartadas (mesmo ID da Atividade).`,
+    naoUsados.length && `${naoUsados.length} arquivo(s) não usados — veja em Bases carregadas.`,
+    ...ausentes.map((a) => `${a.arquivo}: colunas não encontradas → ${a.info.colunas_ausentes.join(", ")}`),
+  ].filter(Boolean);
+  const T = D ? resumo(D.os) : null;
+  return `<div class="card"><div class="card-h"><h2>Reporte semanal</h2>${help("Últimos 7 dias da planilha (contados a partir da data mais recente das OS). Respeita o filtro de Cidade. Use 📋 Copiar imagem e cole no WhatsApp, e-mail ou Teams.")}<div class="dir"><button class="btn pri" id="copiaImg">📋 Copiar imagem</button></div></div>${reporte()}</div>
+  <details open id="detRegras"><summary>Regras do painel ${Object.keys(AJ).length ? '<span class="tag at">ajustadas neste navegador</span>' : '<span class="tag ok">padrão</span>'}</summary><div>${regrasHTML()}</div></details>
+  <details ${avisos.length ? "open" : ""}><summary>Avisos (${avisos.length})</summary><div>${avisos.length ? `<ul class="av">${avisos.map((a) => `<li><span class="tag at">atenção</span> ${esc(a)}</li>`).join("")}</ul>` : '<span class="tag ok">Tudo certo</span>'}</div></details>
+  <details><summary>Conferência</summary><div>${D ? `<table><tbody>
+    <tr><td>OS de sondagem lidas</td><td class="n">${num(D.os.length)}</td></tr><tr><td>Executadas (Finalizada + Encerrada c/ ocorrência)</td><td class="n">${num(T.ex)}</td></tr>
+    <tr><td>Com implantação de ligação</td><td class="n">${num(T.im)}</td></tr><tr><td>OS sem matrícula na base</td><td class="n">${num(semBase.length)}</td></tr>
+    <tr><td>Ligações na base</td><td class="n">${num(D.base.size)}</td></tr><tr><td>Ligações marcadas em "Engenharia execução"</td><td class="n">${num([...D.base.values()].filter((b) => b.eng).length)}</td></tr>
+    ${Object.entries(CLS()).map(([k, l]) => `<tr><td>Base · ${esc(l)}</td><td class="n">${num([...D.base.values()].filter((b) => b.f === k).length)}</td></tr>`).join("")}
+    <tr><td>Status encontrados</td><td>${[...new Set(D.os.map((r) => r.s))].map(esc).join(" · ")}</td></tr></tbody></table>` : "Sem dados."}</div></details>
+  <details><summary>Bases carregadas (${arqs.length})</summary><div><table><thead><tr><th>Arquivo</th><th>Uso</th><th class="n">Linhas</th><th class="n">Usadas</th><th>Modificado</th><th>Motivo / observação</th></tr></thead><tbody>${arqs.map((a) => `<tr><td>${esc(a.arquivo)}</td><td>${a.tipo === "os" ? '<span class="tag ok">OS executadas</span>' : a.tipo === "base" ? '<span class="tag ok">Base de ligações</span>' : '<span class="tag at">não usado</span>'}</td><td class="n">${num(a.linhas)}</td><td class="n">${num(a.registros?.length)}</td><td>${a.modificado ? new Date(a.modificado).toLocaleDateString("pt-BR") : ""}</td><td>${esc(a.motivo || (a.info?.fora_do_codigo ? `${num(a.info.fora_do_codigo)} linhas de outros códigos ignoradas` : ""))}</td></tr>`).join("") || '<tr><td colspan="6">Nenhum arquivo.</td></tr>'}</tbody></table></div></details>
+  <details ${nc.length ? "open" : ""}><summary>Recursos · Engenharia × Serviços (${recs.length})</summary><div>
+    <div class="card-h"><input class="busca" id="qRec" placeholder="Buscar recurso…" value="${esc(BUSCA_REC)}"><div class="dir"><button class="btn" data-all="eng">Filtrados → Engenharia</button><button class="btn" data-all="srv">Filtrados → Serviços</button><button class="btn" data-all="">Filtrados → sem grupo</button></div></div>
+    <div class="tw"><table class="rec"><thead><tr><th>Recurso</th><th class="n">OS</th><th class="n">Exec.</th><th>Grupo</th></tr></thead><tbody id="tRec">${recs.map((r) => { const k = norm(r.n), v = SEL[k] || ""; return `<tr data-k="${esc(k)}"><td>${esc(r.n)}</td><td class="n">${num(r.q)}</td><td class="n">${num(r.e)}</td><td>${[["eng", "Engenharia"], ["srv", "Serviços"], ["", "Sem grupo"]].map(([val, l]) => `<label><input type="radio" name="g_${esc(k)}" value="${val}" ${v === val ? "checked" : ""}> ${l}</label>`).join("")}</td></tr>`; }).join("") || '<tr><td colspan="4">Conecte a pasta para listar os recursos.</td></tr>'}</tbody></table></div>
+    <p class="status" style="color:var(--muted)">A seleção fica guardada neste navegador.</p></div></details>
+  <details><summary>Downloads</summary><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-m3="csv-os">⬇ OS cruzadas com a base</button><button class="btn" data-m3="csv-ruas">⬇ Logradouros</button><button class="btn" data-m3="csv-rec">⬇ Recursos e grupos</button></div></details>
+  <details><summary>Como foi calculado · Produtividade</summary><div><ul class="av">
+    <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b>, dentro dos filtros de mês, cidade e tipo.</li>
+    <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
+    <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
+    <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
+    <li><b>Dias trabalhados</b> = dias diferentes (coluna Data) com pelo menos uma OS. Por equipe: dias daquela equipe. No total: soma dos dias de cada equipe (equipe-dia). <b>Exec./dia</b> = executadas ÷ dias trabalhados.</li>
+    <li><b>Implantação</b> = toda OS executada (ou só as que têm o texto da regra 4, se preenchido).</li>
+    <li>OS repetidas (mesmo ID da Atividade em mais de um arquivo) contam uma vez só.</li></ul></div></details>
+  <details><summary>Como foi calculado · Logradouros</summary><div><ul class="av">
+    <li>A Matrícula da OS é cruzada com o NUM_LIGACAO da base (zeros à esquerda e pontuação são ignorados).</li>
+    <li>Cada ligação da base é contada uma vez, nesta ordem: <b>Eng. (base)</b> se a coluna "Engenharia execução" estiver preenchida; senão <b>Eng. (OS)</b> se uma equipe de Engenharia executou com implantação; senão <b>Serviços</b> se uma equipe de Serviços executou com implantação; senão <b>Falta</b>.</li>
+    <li>Esta aba usa todo o histórico de OS (o filtro de mês não se aplica), para mostrar o que falta de verdade na rua. Cidade e tipo de faturamento filtram a base.</li>
+    <li><b>Faltam fat. indireto</b> = ligações que faltam e hoje só pagam água: é a previsão de receita nova de esgoto.</li></ul></div></details>`;
+}
+function regrasHTML() {
+  const R = RG(), stDados = D ? [...new Set(D.os.map((r) => r.s).filter(Boolean))] : [];
+  const stTodos = [...new Map([...R.status, ...stDados].map((x) => [norm(x), x])).values()].sort();
+  const marc = new Set(R.status.map(norm));
+  const bloco = (n, t, corpo) => `<div style="border-left:3px solid var(--cyan);padding:6px 12px;margin:10px 0"><div style="font-weight:700;color:var(--marinho)">${n}. ${t}</div><div style="margin-top:4px">${corpo}</div></div>`;
+  const inp = (id, v, w = 320) => `<input class="busca" id="${id}" value="${esc(v)}" style="min-width:0;width:min(${w}px,100%)">`;
+  return bloco(1, "Visita (entra na conta)", `OS com Código/Descrição contendo <b>${esc(R.codigo)}</b>. As outras OS são ignoradas na leitura. <span style="color:var(--muted)">(muda em pacote/regras.json)</span>`)
+    + bloco(2, "OS executada (produtividade)", `Status da Atividade que contam como executada:<div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px">${stTodos.map((x) => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="rgSt" value="${esc(x)}" ${marc.has(norm(x)) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Produtividade = executadas ÷ visitas. A lista mostra os status encontrados nas planilhas.</div>`)
+    + bloco(3, "Meta de produtividade", `${inp("rgMeta", Math.round(R.meta * 1000) / 10, 80)} % — abaixo disso fica em laranja.`)
+    + bloco(4, "Implantação (OS)", `${R.impl ? "OS executada cuja coluna <b>Serviço adicionais resposta</b> contém o texto abaixo." : "<b>Toda OS executada conta como implantação.</b>"} Para exigir um texto em <b>Serviço adicionais resposta</b>, escreva aqui (vazio = toda executada): ${inp("rgImpl", R.impl)}<div style="color:var(--muted);font-size:12px">Maiúsculas e acentos não importam.</div>`)
+    + bloco(5, "Ligação feita na rua (aba Logradouros)", `Cada ligação da base conta uma vez, nesta ordem:<ol style="margin:4px 0;padding-left:20px"><li><b>Engenharia (base)</b>: coluna <b>Engenharia execução</b> preenchida com qualquer valor, exceto: ${inp("rgEng", R.engNao.map((v) => v || "(vazio)").join(", "), 520)}</li><li><b>Engenharia (OS)</b>: ligação implantada (regra 4) por um recurso do grupo Engenharia;</li><li><b>Serviços (OS)</b>: ligação implantada por um recurso do grupo Serviços;</li><li>senão, <b>Falta</b>.</li></ol><div style="color:var(--muted);font-size:12px">Usa todo o histórico de OS, sem o filtro de mês. A matrícula da OS é cruzada com NUM_LIGACAO (zeros à esquerda e pontuação ignorados).</div>`)
+    + bloco(6, "Tipo de faturamento", `<span class="tag PAD">Padronização</span> quando TIPO_FATURAMENTO contém ${inp("rgPad", R.pad, 140)} · <span class="tag IND">Fat. indireto esgoto</span> quando não contém (só água → receita nova de esgoto) · <span class="tag SEM">Sem informação</span> quando vazio.`)
+    + bloco(7, "Equipes e grupos", `Equipe ativa = recurso diferente com pelo menos uma OS no período. Engenharia × Serviços vem da seleção em <b>Recursos</b>. OS repetidas (mesmo ID da Atividade) contam uma vez.`)
+    + `<div style="display:flex;gap:8px;margin-top:12px"><button class="btn pri" id="rgAplica">Aplicar regras</button><button class="btn" id="rgPadrao">Restaurar padrão</button><span style="color:var(--muted);font-size:12px;align-self:center">Os ajustes ficam neste navegador. Padrão: pacote/regras.json · versão ${VERSAO_SITE}</span></div>`;
+}
+function ligaRegras() {
+  const a = $("rgAplica"); if (!a) return;
+  a.onclick = () => {
+    const meta = parseFloat(String($("rgMeta").value).replace(",", ".")) / 100;
+    AJ = { v: 2, status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
+      engNao: $("rgEng").value.split(",").map((x) => x.trim()).map((x) => /^\(?vazio\)?$/i.test(x) ? "" : x), meta: isFinite(meta) && meta > 0 ? meta : RG().meta };
+    if (!AJ.engNao.includes("")) AJ.engNao.push("");
+    try { localStorage.setItem("regrasPainel", JSON.stringify(AJ)); } catch (e) {}
+    reaplica(); toast("Regras aplicadas.");
+  };
+  $("rgPadrao").onclick = () => { AJ = {}; try { localStorage.removeItem("regrasPainel"); } catch (e) {} reaplica(); toast("Regras padrão restauradas."); };
+}
+function reaplica() { if (D) aplicaRegras(D.os, D.base); desenha(); }
+function ligaDados() {
+  ligaRegras();
+  const cp = $("copiaImg"); if (cp) cp.onclick = copiaImagem;
+  const q = $("qRec"); if (q) { const ap = () => { BUSCA_REC = q.value; const t = norm(q.value); document.querySelectorAll("#tRec tr[data-k]").forEach((tr) => tr.hidden = !tr.dataset.k.includes(t)); }; q.oninput = ap; ap(); }
+  const t = $("tRec"); if (t) t.onchange = (e) => { const tr = e.target.closest("tr"); if (!tr) return; const k = tr.dataset.k; if (e.target.value) SEL[k] = e.target.value; else delete SEL[k]; salvaSel(); };
+  document.querySelectorAll("[data-all]").forEach((b) => b.onclick = () => { document.querySelectorAll("#tRec tr[data-k]").forEach((tr) => { if (tr.hidden) return; const k = tr.dataset.k; if (b.dataset.all) SEL[k] = b.dataset.all; else delete SEL[k]; }); salvaSel(); desenha(); });
+  document.querySelectorAll("[data-m3]").forEach((b) => b.onclick = () => { if (!D) return toast("Conecte a pasta primeiro.", true); const m = b.dataset.m3; if (m === "csv-os") csvOS(); if (m === "csv-ruas") csvRuas(); if (m === "csv-rec") baixaCSV("painel_esgoto_recursos.csv", ["Recurso", "Grupo", "OS", "Executadas"], recursos().map((r) => [r.n, GN[grupo(r.n)], r.q, r.e])); });
+}
+function salvaSel() { try { localStorage.setItem("selRecursos", JSON.stringify(SEL)); } catch (e) {} toast("Grupos dos recursos salvos."); }
+async function copiaImagem() {
+  const el = $("reporte"); if (!el || !window.html2canvas) return toast("Não foi possível gerar a imagem.", true);
+  const cv = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff" });
+  cv.toBlob(async (blob) => {
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); toast("Imagem copiada. É só colar."); }
+    catch (e) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reporte_semanal_esgoto.png"; a.click(); toast("O navegador não deixou copiar; a imagem foi baixada."); }
+  });
+}
+
+/* ================= início ================= */
+(async () => {
+  worker.postMessage({ fase: "preparar" });
+  desenha();
+  await regrasProntas;
+  const ultima = await dbGet("cache", "__ultima__");
+  if (ultima) monta(ultima);
+  if (!("showDirectoryPicker" in window)) return;
+  pastaHandle = await dbGet("pasta", "atual"); if (!pastaHandle) return;
+  $("btnAtualizar").disabled = false;
+  if ((await pastaHandle.queryPermission({ mode: "read" })) === "granted") return lePasta();
+  $("status").textContent += " · clique em qualquer lugar para ler a pasta de novo";
+  const umClique = () => { document.removeEventListener("pointerdown", umClique, true); lePasta(); };
+  document.addEventListener("pointerdown", umClique, true);
+})();
+</script>
+</body>
+</html>
