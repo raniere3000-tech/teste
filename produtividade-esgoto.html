@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v9</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v10</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -141,8 +141,8 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
     </div>
   </div>
   <div class="l2">
-    <div class="f"><label>Mês inicial</label><select id="fIni"></select></div>
-    <div class="f"><label>Mês final</label><select id="fFim"></select></div>
+    <div class="f"><label>Mês</label><div class="multi" id="fMes"></div></div>
+    <div class="f"><label>Data</label><div class="multi" id="fDia"></div></div>
     <div class="f"><label>Cidade</label><div class="multi" id="fCid"></div></div>
     <div class="f"><label>Tipo de faturamento</label><div class="multi" id="fTipo"></div></div>
     <label class="chk"><input type="checkbox" id="fNc"> Mostrar recursos não classificados</label>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v9-20261113";
+const VERSAO_SITE = "v10-20261113";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -320,31 +320,46 @@ function monta(ultima) {
 }
 
 /* ================= filtros ================= */
-const F = { ini: "", fim: "", cid: new Set(), tipo: new Set(), nc: false };
-function multi(el, opcoes, set, rotTodos) {
-  const txt = () => set.size === 0 ? rotTodos : set.size === 1 ? [...set][0] : `${set.size} selecionados`;
-  el.innerHTML = `<button type="button">${esc(txt())} ▾</button><div class="pop" hidden>${opcoes.map(([v, l]) => `<label><input type="checkbox" value="${esc(v)}" ${set.has(v) ? "checked" : ""}> ${esc(l)}</label>`).join("") || "<i>Sem opções</i>"}</div>`;
+const F = { mes: new Set(), dia: new Set(), cid: new Set(), tipo: new Set(), nc: false };
+// lista suspensa com seleção múltipla: Todos / Nenhum, busca quando a lista é grande
+function multi(el, opcoes, set, rotTodos, aoMudar) {
+  const rot = new Map(opcoes);
+  const txt = () => set.size === 0 ? rotTodos : set.size === 1 ? rot.get([...set][0]) ?? [...set][0] : `${set.size} selecionados`;
+  const busca = opcoes.length > 8 ? `<input class="busca" placeholder="Buscar…" style="width:100%;min-width:0;margin-bottom:4px">` : "";
+  el.innerHTML = `<button type="button">${esc(txt())} ▾</button><div class="pop" hidden>${opcoes.length ? `${busca}<div style="display:flex;gap:6px;margin-bottom:4px"><button type="button" class="btn" data-t="1">Marcar todos</button><button type="button" class="btn" data-t="0">Limpar</button></div>` : ""}<div class="ops">${opcoes.map(([v, l]) => `<label><input type="checkbox" value="${esc(v)}" ${set.has(v) ? "checked" : ""}> ${esc(l)}</label>`).join("") || "<i>Sem opções</i>"}</div></div>`;
   const pop = el.querySelector(".pop"), b = el.querySelector("button");
+  const muda = () => { b.textContent = txt() + " ▾"; aoMudar ? aoMudar() : desenha(); };
   b.onclick = (e) => { e.stopPropagation(); document.querySelectorAll(".multi .pop").forEach((p) => p !== pop && (p.hidden = true)); pop.hidden = !pop.hidden; };
-  pop.onclick = (e) => e.stopPropagation();
-  pop.onchange = (e) => { e.target.checked ? set.add(e.target.value) : set.delete(e.target.value); b.textContent = txt() + " ▾"; desenha(); };
+  pop.onclick = (e) => {
+    e.stopPropagation(); const t = e.target.dataset.t; if (t === undefined) return;
+    pop.querySelectorAll(".ops label").forEach((l) => { if (l.hidden) return; const c = l.querySelector("input"); c.checked = t === "1"; c.checked ? set.add(c.value) : set.delete(c.value); });
+    if (t === "1" && set.size === opcoes.length) set.clear(), pop.querySelectorAll(".ops input").forEach((c) => c.checked = false);
+    muda();
+  };
+  pop.onchange = (e) => { if (!e.target.value && e.target.type !== "checkbox") return; e.target.checked ? set.add(e.target.value) : set.delete(e.target.value); muda(); };
+  const q = pop.querySelector("input.busca"); if (q) q.oninput = () => { const t = norm(q.value); pop.querySelectorAll(".ops label").forEach((l) => l.hidden = !norm(l.textContent).includes(t)); };
 }
 document.addEventListener("click", () => { document.querySelectorAll(".multi .pop").forEach((p) => p.hidden = true); $("menu").hidden = true; });
+function montaDias() {
+  const dias = [...new Set(D.os.filter((r) => r.v && r.d && (!F.mes.size || F.mes.has(r.mes))).map((r) => r.d))].sort().reverse();
+  for (const d of [...F.dia]) if (!dias.includes(d)) F.dia.delete(d);
+  const sem = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  multi($("fDia"), dias.map((d) => [d, `${dataBR(d)} · ${sem[new Date(d + "T12:00:00").getDay()]}`]), F.dia, "Todas");
+}
 function montaFiltros() {
-  const meses = [...new Set(D.os.map((r) => r.mes).filter(Boolean))].sort();
-  const opt = (sel) => `<option value="">Todos</option>` + meses.map((m) => `<option value="${m}" ${m === sel ? "selected" : ""}>${mesLongo(m)}</option>`).join("");
-  $("fIni").innerHTML = opt(F.ini); $("fFim").innerHTML = opt(F.fim);
+  const meses = [...new Set(D.os.map((r) => r.mes).filter(Boolean))].sort().reverse();
+  for (const m of [...F.mes]) if (!meses.includes(m)) F.mes.delete(m);
+  multi($("fMes"), meses.map((m) => [m, mesLongo(m)]), F.mes, "Todos", () => { montaDias(); desenha(); });
+  montaDias();
   const cids = [...new Set([...D.os.map((r) => r.c || r.B?.c), ...[...D.base.values()].map((b) => b.c)].filter(Boolean).map((c) => c.trim()))].sort();
   multi($("fCid"), cids.map((c) => [c, c]), F.cid, "Todas");
   multi($("fTipo"), Object.entries(CLS()), F.tipo, "Todos");
 }
-$("fIni").onchange = (e) => { F.ini = e.target.value; desenha(); };
-$("fFim").onchange = (e) => { F.fim = e.target.value; desenha(); };
 $("fNc").onchange = (e) => { F.nc = e.target.checked; desenha(); };
-$("limpar").onclick = () => { F.ini = F.fim = ""; F.cid.clear(); F.tipo.clear(); F.nc = false; $("fNc").checked = false; if (D) { montaFiltros(); desenha(); } };
+$("limpar").onclick = () => { F.mes.clear(); F.dia.clear(); F.cid.clear(); F.tipo.clear(); F.nc = false; $("fNc").checked = false; if (D) { montaFiltros(); desenha(); } };
 const cidOk = (c) => !F.cid.size || F.cid.has((c || "").trim());
 const tipoOk = (f) => !F.tipo.size || F.tipo.has(f || "SEM");
-const osFiltradas = () => D.os.filter((r) => r.v && (!F.ini || r.mes >= F.ini) && (!F.fim || r.mes <= F.fim) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
+const osFiltradas = () => D.os.filter((r) => r.v && (!F.mes.size || F.mes.has(r.mes)) && (!F.dia.size || F.dia.has(r.d)) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
 const baseFiltrada = () => [...D.base.values()].filter((b) => cidOk(b.c) && tipoOk(b.f));
 
 /* ================= abas ================= */
@@ -408,7 +423,8 @@ function situacaoRuas() {
 function vazio() { return `<div class="card vazio"><b>Nenhum dado carregado</b>Clique em 📁 Conectar pasta e escolha a pasta com a planilha de OS executadas e a base de ligações.</div>`; }
 function desenha() {
   CLIQUES.clear(); nClique = 0;
-  if (D) { const p = [F.ini, F.fim].some(Boolean) ? ` — ${F.ini ? mesLongo(F.ini) : "início"} a ${F.fim ? mesLongo(F.fim) : "hoje"}` : ""; $("titulo").textContent = "Produtividade · Execução de Esgoto" + p; }
+  if (D) { const ms = [...F.mes].sort(), ds = [...F.dia].sort();
+    const p = ds.length ? ` — ${ds.length === 1 ? dataBR(ds[0]) : ds.length + " datas (" + dataBR(ds[0]) + " a " + dataBR(ds[ds.length - 1]) + ")"}` : ms.length ? ` — ${ms.length <= 2 ? ms.map(mesLongo).join(" e ") : ms.length + " meses"}` : ""; $("titulo").textContent = "Produtividade · Execução de Esgoto" + p; }
   if (ABA === "prod") $("a-prod").innerHTML = D ? abaProd() : vazio();
   if (ABA === "ruas") { $("a-ruas").innerHTML = D ? abaRuas() : vazio(); ligaBuscaRuas(); }
   if (ABA === "dados") { $("a-dados").innerHTML = abaDados(); ligaDados(); }
@@ -561,7 +577,7 @@ function abaDados() {
     <p class="status" style="color:var(--muted)">A seleção fica guardada neste navegador.</p></div></details>
   <details><summary>Downloads</summary><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-m3="csv-os">⬇ OS cruzadas com a base</button><button class="btn" data-m3="csv-ruas">⬇ Logradouros</button><button class="btn" data-m3="csv-rec">⬇ Recursos e grupos</button></div></details>
   <details><summary>Como foi calculado · Produtividade</summary><div><ul class="av">
-    <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b> e status de visita (padrão: Visitada, Finalizada, Encerrada com Ocorrência), dentro dos filtros de mês, cidade e tipo. Paralisada e outros status ficam fora.</li>
+    <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b> e status de visita (padrão: Visitada, Finalizada, Encerrada com Ocorrência), dentro dos filtros de mês, data, cidade e tipo. Paralisada e outros status ficam fora.</li>
     <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
     <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
