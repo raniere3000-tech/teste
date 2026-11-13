@@ -32,6 +32,10 @@ h1{margin:0;font-size:22px;font-weight:700;text-wrap:balance}
 .sync{font-size:12px;color:#bfe0eb;display:flex;align-items:center;gap:6px}
 .sync i{width:8px;height:8px;border-radius:50%;background:#fca5a5;display:inline-block}
 .sync.on i{background:#86efac}
+.pasta-acts{display:flex;gap:6px;flex-wrap:wrap}
+.hbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:5px 10px;font:600 12px var(--f);cursor:pointer}
+.hbtn:hover{background:rgba(255,255,255,.22)}
+.hrow>.sync{margin-left:auto}
 nav.tabs{display:flex;gap:4px}
 nav.tabs button{background:none;border:0;color:#c8d6e5;font:600 14px var(--f);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer}
 nav.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:#16a5b8}
@@ -333,8 +337,10 @@ async function lerPasta() {
   st.evs = evs; st.vals = vals; live = true;
   const n = Object.values(evs).reduce((s, a) => s + a.length, 0);
   setSync(true, 'Pasta: ' + dir.name + ' · ' + n + ' arquivo(s)');
-  $('#banner').hidden = false;
-  $('#banner').innerHTML = `Salvando na pasta <b>${esc(dir.name)}</b>. Cada indicador tem uma subpasta com o próprio nome; arquivos colocados direto nessas subpastas também aparecem como anexos. <button class="btn sm" data-pasta="ler">Atualizar da pasta</button> <button class="btn sm ghost" data-pasta="nova">Trocar pasta</button>`;
+  $('#banner').hidden = true;
+  let pa = document.getElementById('pasta-acts');
+  if (!pa) { pa = document.createElement('div'); pa.id = 'pasta-acts'; pa.className = 'pasta-acts'; $('#sync').after(pa); }
+  pa.innerHTML = '<button class="hbtn" data-pasta="ler" title="Lê de novo as subpastas e o arquivo de dados">Atualizar da pasta</button><button class="hbtn" data-pasta="nova">Trocar pasta</button>';
   keepFocus(render);
 }
 async function gravarDados() { const fh = await dir.getFileHandle('dados-metas-2026.json', { create: true }); const w = await fh.createWritable(); await w.write(JSON.stringify(st.vals, null, 1)); await w.close(); }
