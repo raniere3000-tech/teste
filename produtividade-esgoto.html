@@ -96,6 +96,9 @@ td.ok{background:var(--ok-fundo)!important;color:var(--ok-texto);font-weight:600
 /* gráfico */
 svg text{font-family:'IBM Plex Sans Condensed',sans-serif;fill:#1f2d3d;font-size:11px}
 .leg{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:4px}
+.gtip{position:absolute;pointer-events:none;background:#05050D;color:#fff;border:1px solid #394D73;border-radius:6px;padding:8px 10px;font-size:12px;z-index:5;min-width:250px}
+.gtip table{font-size:12px;margin-top:4px}.gtip td{color:#fff;padding:2px 6px;border:0;background:none!important;text-align:right}.gtip td:first-child{text-align:left}
+.leg{flex-wrap:wrap}
 .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 /* aba Dados */
 details{background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:10px}
@@ -124,7 +127,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v10</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v11</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +167,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v10-20261113";
+const VERSAO_SITE = "v11-20261113";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -451,51 +454,56 @@ function cardGrupo(g, o) {
   return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Produtividade", pct(T.prod), "", T.prod < meta)}${kpi("Exec./equipe", num(T.ex / recs.length))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}</div>
   <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n">Prod.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
 }
-function barras(meses, series, alt = 220) {
-  const W = Math.max(520, meses.length * 70), H = alt, pad = { l: 36, b: 28, t: 18, r: 8 };
-  const max = Math.max(4, Math.ceil(Math.max(...series.flatMap((s) => s.v)) / 4) * 4); const bw = (W - pad.l - pad.r) / meses.length; const w = Math.min(26, (bw - 10) / series.length);
-  let g = "";
-  for (let i = 0; i <= 4; i++) { const y = pad.t + (H - pad.t - pad.b) * (1 - i / 4); g += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y}" y2="${y}" stroke="#dbe4ec"/><text x="${pad.l - 4}" y="${y + 4}" text-anchor="end">${(max * i / 4).toLocaleString("pt-BR")}</text>`; }
-  meses.forEach((m, i) => {
-    const x0 = pad.l + bw * i + (bw - w * series.length) / 2;
-    series.forEach((s, j) => { const v = s.v[i], h = (H - pad.t - pad.b) * v / max, y = H - pad.b - h; g += `<rect x="${x0 + j * w}" y="${y}" width="${w - 2}" height="${h}" fill="${s.cor}" rx="2"><title>${s.nome} · ${mesLongo(m)}: ${num(v)}</title></rect>${v ? `<text x="${x0 + j * w + (w - 2) / 2}" y="${y - 3}" text-anchor="middle">${num(v)}</text>` : ""}`; });
-    g += `<text x="${pad.l + bw * i + bw / 2}" y="${H - 8}" text-anchor="middle">${mesCurto(m)}</text>`;
+let GRAF = "mes";                                   // "mes" | "dia"
+const SEM = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+function grafico(L) {
+  const dia = GRAF === "dia", chave = (r) => dia ? r.d : r.mes;
+  const per = [...new Set(L.map(chave).filter(Boolean))].sort();
+  if (!per.length) return `<div class="vazio" style="padding:20px">Sem OS no período.</div>`;
+  const meta = RG().meta;
+  const dados = per.map((k) => {
+    const P = L.filter((r) => chave(r) === k), o = { k, vis: P.length, ex: P.filter((r) => r.e).length };
+    for (const g of ["eng", "srv"]) { const Q = P.filter((r) => grupo(r.r) === g); o[g] = Q.filter((r) => r.e).length; o[g + "V"] = Q.length; o[g + "Eq"] = new Set(Q.map((r) => r.r)).size; }
+    o.prod = o.vis ? o.ex / o.vis : 0; return o;
   });
-  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${Math.min(W, 520)}px;max-height:${H + 40}px" role="img">${g}</svg></div><div class="leg">${series.map((s) => `<span><i style="background:${s.cor}"></i>${s.nome}</span>`).join("")}</div>`;
+  const n = per.length, slot = dia ? 38 : 90, W = Math.max(1100, n * slot + 90), H = 300, pd = { l: 44, r: 46, t: 26, b: dia ? 44 : 30 };
+  const ih = H - pd.t - pd.b, iw = W - pd.l - pd.r, bw = iw / n;
+  const vmax = Math.max(...dados.flatMap((d) => [d.eng, d.srv]), 1), passo = Math.max(1, Math.ceil(vmax / 4)), max = passo * 4;
+  const y = (v) => pd.t + ih * (1 - v / max), yp = (p) => pd.t + ih * (1 - p);
+  let g = "";
+  for (let i = 0; i <= 4; i++) { const yy = pd.t + ih * (1 - i / 4); g += `<line x1="${pd.l}" x2="${W - pd.r}" y1="${yy}" y2="${yy}" stroke="#dbe4ec"/><text x="${pd.l - 6}" y="${yy + 4}" text-anchor="end">${(passo * i).toLocaleString("pt-BR")}</text><text x="${W - pd.r + 6}" y="${yy + 4}" fill="#64748b">${i * 25}%</text>`; }
+  g += `<line x1="${pd.l}" x2="${W - pd.r}" y1="${yp(meta)}" y2="${yp(meta)}" stroke="#E8710A" stroke-dasharray="5 4"/><text x="${W - pd.r - 4}" y="${yp(meta) - 5}" text-anchor="end" fill="#C2560C">meta ${pct(meta)}</text>`;
+  const w = Math.min(dia ? 13 : 34, (bw - 8) / 2);
+  dados.forEach((d, i) => {
+    const cx = pd.l + bw * i + bw / 2, fds = dia && [0, 6].includes(new Date(d.k + "T12:00:00").getDay());
+    if (fds) g += `<rect x="${cx - bw / 2}" y="${pd.t}" width="${bw}" height="${ih}" fill="#f3f6f9"/>`;
+    [["eng", "#1A2740", -1], ["srv", "#176b9c", 0]].forEach(([k, cor, o]) => { const v = d[k]; if (!v) return; const x = cx + o * w; g += `<rect x="${x}" y="${y(v)}" width="${w - 2}" height="${y(0) - y(v)}" fill="${cor}" rx="2"/>` + (bw > 26 ? `<text x="${x + (w - 2) / 2}" y="${y(v) - 4}" text-anchor="middle" font-size="10">${v}</text>` : ""); });
+    const lab = dia ? `${d.k.slice(8, 10)}/${d.k.slice(5, 7)}` : mesCurto(d.k);
+    if (!dia || n <= 45 || i % 2 === 0) g += `<text x="${cx}" y="${H - pd.b + 15}" text-anchor="middle">${lab}</text>` + (dia ? `<text x="${cx}" y="${H - pd.b + 28}" text-anchor="middle" fill="#64748b" font-size="10">${SEM[new Date(d.k + "T12:00:00").getDay()]}</text>` : "");
+  });
+  const pts = dados.map((d, i) => [pd.l + bw * i + bw / 2, yp(Math.min(1, d.prod))]);
+  g += `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="#16a5b8" stroke-width="2.5"/>` + pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#fff" stroke="${dados[i].prod < meta ? "#E8710A" : "#16a5b8"}" stroke-width="2"/>`).join("");
+  g += dados.map((d, i) => `<rect class="hz" data-i="${i}" x="${pd.l + bw * i}" y="${pd.t}" width="${bw}" height="${ih}" fill="transparent"/>`).join("");
+  GRAF_DADOS = dados;
+  return `<div style="overflow-x:auto;position:relative" id="grafBox"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${Math.min(W, 1100) * 0.6}px;display:block" role="img">${g}</svg><div id="grafTip" class="gtip" hidden></div></div>
+  <div class="leg"><span><i style="background:#1A2740"></i>Engenharia (executadas)</span><span><i style="background:#176b9c"></i>Serviços (executadas)</span><span><i style="background:#16a5b8;height:3px;vertical-align:3px"></i>Produtividade (eixo direito)</span><span><i style="background:#E8710A;height:2px;vertical-align:4px"></i>Meta</span>${dia ? '<span><i style="background:#f3f6f9;border:1px solid #dbe4ec"></i>Fim de semana</span>' : ""}</div>`;
 }
+let GRAF_DADOS = [];
 function cardGrafMes(L) {
-  const meses = [...new Set(L.map((r) => r.mes).filter(Boolean))].sort();
-  if (!meses.length) return "";
-  const conta = (g) => meses.map((m) => L.filter((r) => r.mes === m && r.e && grupo(r.r) === g).length);
-  return `<div class="card"><div class="card-h"><h2>Executadas por mês</h2>${help("Quantidade de OS executadas (Finalizada + Encerrada com Ocorrência) em cada mês, separadas por Engenharia e Serviços.")}</div>${barras(meses, [{ nome: "Engenharia", cor: "#1A2740", v: conta("eng") }, { nome: "Serviços", cor: "#176b9c", v: conta("srv") }])}</div>`;
+  const bt = (v, t) => `<button class="btn ${GRAF === v ? "pri" : ""}" data-graf="${v}">${t}</button>`;
+  return `<div class="card"><div class="card-h"><h2>Execução ${GRAF === "dia" ? "diária" : "mensal"}</h2>${help("Barras: OS executadas por Engenharia e Serviços em cada " + (GRAF === "dia" ? "dia" : "mês") + ". Linha: produtividade (executadas ÷ visitas), no eixo da direita; ponto laranja = abaixo da meta. Passe o mouse para ver os detalhes. Respeita todos os filtros.")}<div class="dir">${bt("mes", "Mensal")}${bt("dia", "Diária")}</div></div>${grafico(L)}</div>`;
 }
-
-let BUSCA_RUA = "";
-function abaRuas() {
-  const R = situacaoRuas(); const t = R.reduce((s, r) => (s.tot += r.tot, s.f += r.feitas, s.fa += r.falta.length, s.fi += r.faltaInd, s.c += r.falta.length === 0 ? 1 : 0, s), { tot: 0, f: 0, fa: 0, fi: 0, c: 0 });
-  let h = `<div class="kpis">${kpi("Logradouros", num(R.length))}${kpi("Ligações na base", num(t.tot))}${kpi("Feitas", num(t.f))}${kpi("Faltam", num(t.fa), "", t.fa > 0)}${kpi("% concluído", pct(t.f / t.tot))}${kpi("Ruas concluídas", num(t.c))}${kpi("Previsão fat. indireto", num(t.fi), "faltam e só pagam água")}</div>`;
-  h += `<div class="card"><div class="card-h"><h2>Execução por logradouro</h2>${help("Cruza a Matrícula das OS com o NUM_LIGACAO da base. Feita = coluna Engenharia execução preenchida na base, ou OS executada com implantação de ligação (todo o período, sem o filtro de mês). Fat. indireto = TIPO_FATURAMENTO só água (ligação nova gera receita de esgoto). Padronização = já fatura água e esgoto. Clique num número para ver os clientes.")}<div class="dir"><input class="busca" id="bRua" placeholder="Buscar logradouro…" value="${esc(BUSCA_RUA)}"><button class="btn" data-m2="csv-ruas">⬇ CSV</button></div></div>
-  <div class="tw" style="max-height:600px"><table id="tRuas"><thead><tr><th>Logradouro</th><th>Bairro</th><th>Cidade</th><th class="n">Ligações</th><th class="n">Fat. ind.</th><th class="n">Padron.</th><th class="n">Eng. (base)</th><th class="n">Eng. (OS)</th><th class="n">Serviços</th><th class="n">Feitas</th><th class="n">Faltam</th><th class="n">Faltam fat. ind.</th><th>% concluído</th></tr></thead><tbody>
-  ${R.map((r) => { const p = r.tot ? r.feitas / r.tot : 0; const n = r.rua; return `<tr data-rua="${esc(norm(r.rua))}"><td>${esc(r.rua)}</td><td>${esc(r.bairro)}</td><td>${esc(r.cid)}</td>${lk(r.tot, n + " · ligações", () => r.L.map((b) => linhaBase(b, b.sit)))}${lk(r.ind, n + " · fat. indireto", () => r.L.filter((b) => b.f === "IND").map((b) => linhaBase(b, b.sit)))}${lk(r.pad, n + " · padronização", () => r.L.filter((b) => b.f === "PAD").map((b) => linhaBase(b, b.sit)))}${lk(r.engB.length, n + " · engenharia (base)", () => r.engB.map((b) => linhaBase(b, "Engenharia (base)")))}${lk(r.engO.length, n + " · engenharia (OS)", () => r.engO.map((b) => linhaBase(b, "Engenharia (OS)")))}${lk(r.srv.length, n + " · serviços", () => r.srv.map((b) => linhaBase(b, "Serviços (OS)")))}${lk(r.feitas, n + " · feitas", () => [...r.engB, ...r.engO, ...r.srv].map((b) => linhaBase(b, "Feita")))}${r.falta.length ? lk(r.falta.length, n + " · faltam", () => r.falta.map((b) => linhaBase(b, "Falta"))).replace('class="n lk"', 'class="n lk low"') : `<td class="n ok">-</td>`}${lk(r.faltaInd, n + " · faltam (fat. indireto)", () => r.falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")))}<td><div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div> ${pct(p)}</td></tr>`; }).join("")}
-  </tbody><tfoot><tr class="tot"><td>Total</td><td></td><td></td>${totRuas(R)}<td>${pct(t.f / t.tot)}</td></tr></tfoot></table></div></div>`;
-  const top = R.filter((r) => r.falta.length).slice(0, 15);
-  if (top.length) h += `<div class="card"><div class="card-h"><h2>Logradouros com mais ligações faltando</h2>${help("As 15 ruas com mais ligações ainda sem execução. Marinho = feitas, laranja = faltam.")}</div>${barrasH(top)}</div>`;
-  return h;
-}
-function totRuas(R) {
-  const all = (fn) => R.flatMap(fn), T = "Todos os logradouros";
-  const sb = (b) => b.sit, ind = all((r) => r.L.filter((b) => b.f === "IND")), pad = all((r) => r.L.filter((b) => b.f === "PAD"));
-  const engB = all((r) => r.engB), engO = all((r) => r.engO), srv = all((r) => r.srv), falta = all((r) => r.falta);
-  return lk(R.reduce((s, r) => s + r.tot, 0), T + " · ligações", () => all((r) => r.L).map((b) => linhaBase(b, sb(b))))
-    + lk(ind.length, T + " · fat. indireto", () => ind.map((b) => linhaBase(b, sb(b))))
-    + lk(pad.length, T + " · padronização", () => pad.map((b) => linhaBase(b, sb(b))))
-    + lk(engB.length, T + " · engenharia (base)", () => engB.map((b) => linhaBase(b, "Engenharia (base)")))
-    + lk(engO.length, T + " · engenharia (OS)", () => engO.map((b) => linhaBase(b, "Engenharia (OS)")))
-    + lk(srv.length, T + " · serviços", () => srv.map((b) => linhaBase(b, "Serviços (OS)")))
-    + lk(engB.length + engO.length + srv.length, T + " · feitas", () => [...engB.map((b) => linhaBase(b, "Engenharia (base)")), ...engO.map((b) => linhaBase(b, "Engenharia (OS)")), ...srv.map((b) => linhaBase(b, "Serviços (OS)"))])
-    + lk(falta.length, T + " · faltam", () => falta.map((b) => linhaBase(b, "Falta")))
-    + lk(falta.filter((b) => b.f === "IND").length, T + " · faltam (fat. indireto)", () => falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")));
-}
+document.addEventListener("click", (e) => { const v = e.target.dataset?.graf; if (v && v !== GRAF) { GRAF = v; desenha(); } });
+document.addEventListener("mousemove", (e) => {
+  const tip = $("grafTip"); if (!tip) return;
+  const hz = e.target.closest?.(".hz"); if (!hz) { tip.hidden = true; return; }
+  const d = GRAF_DADOS[+hz.dataset.i]; if (!d) return;
+  const tit = GRAF === "dia" ? `${dataBR(d.k)} · ${SEM[new Date(d.k + "T12:00:00").getDay()]}` : mesLongo(d.k);
+  tip.innerHTML = `<b>${tit}</b><table><tr><td></td><td>Equipes</td><td>Visitas</td><td>Exec.</td><td>Prod.</td></tr>${[["eng", "Engenharia"], ["srv", "Serviços"]].map(([k, l]) => `<tr><td>${l}</td><td>${num(d[k + "Eq"])}</td><td>${num(d[k + "V"])}</td><td>${num(d[k])}</td><td>${pct(d[k + "V"] ? d[k] / d[k + "V"] : 0)}</td></tr>`).join("")}<tr><td><b>Total</b></td><td></td><td><b>${num(d.vis)}</b></td><td><b>${num(d.ex)}</b></td><td><b>${pct(d.prod)}</b></td></tr></table>`;
+  const box = $("grafBox").getBoundingClientRect(); tip.hidden = false;
+  let x = e.clientX - box.left + $("grafBox").scrollLeft + 14; if (x + 260 > box.width + $("grafBox").scrollLeft) x -= 290;
+  tip.style.left = x + "px"; tip.style.top = Math.max(0, e.clientY - box.top - 20) + "px";
+});
 function barrasH(R) {
   const W = 760, lh = 24, lx = 230, H = R.length * lh + 10, max = Math.max(...R.map((r) => r.tot));
   const g = R.map((r, i) => { const y = 5 + i * lh, wf = (W - lx - 60) * r.feitas / max, wa = (W - lx - 60) * r.falta.length / max;
