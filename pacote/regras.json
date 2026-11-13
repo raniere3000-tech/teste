@@ -35,7 +35,12 @@
       "Encerrada com Ocorrência"
     ],
     "implantacao": "",
-    "implantacao_obs": "vazio = toda OS executada conta como implantação"
+    "implantacao_obs": "vazio = toda OS executada conta como implantação",
+    "status_visita": [
+      "Visitada",
+      "Finalizada",
+      "Encerrada com Ocorrência"
+    ]
   },
   "base": {
     "rotulo": "Base de ligações por logradouro",

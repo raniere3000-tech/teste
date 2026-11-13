@@ -124,7 +124,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v8</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v9</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -164,7 +164,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v8-20261112";
+const VERSAO_SITE = "v9-20261113";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -199,6 +199,7 @@ function RG() {
   const o = REGRAS.os || {}, b = REGRAS.base || {};
   return {
     codigo: o.codigo_alvo || "SONDAGEM DE REDE DE ESGOTO",
+    visita: AJ.visita ?? o.status_visita ?? ["VISITADA", "FINALIZADA", "ENCERRADA COM OCORRENCIA"],
     status: AJ.status ?? o.status_executada ?? ["FINALIZADA", "ENCERRADA COM OCORRENCIA"],
     impl: AJ.impl ?? o.implantacao ?? "",
     meta: AJ.meta ?? REGRAS.meta_produtividade ?? 0.7,
@@ -208,8 +209,8 @@ function RG() {
 }
 // recalcula executada / implantação / classe de faturamento / engenharia com as regras efetivas
 function aplicaRegras(os, base) {
-  const R = RG(), st = new Set(R.status.map(norm)), im = norm(R.impl), pad = norm(R.pad), nao = new Set(R.engNao.map(norm));
-  for (const r of os) { r.e = st.has(norm(r.s)); r.i = r.e && (r.ad !== undefined ? norm(r.ad).includes(im) : r.i); }
+  const R = RG(), st = new Set(R.status.map(norm)), vi = new Set([...R.visita, ...R.status].map(norm)), im = norm(R.impl), pad = norm(R.pad), nao = new Set(R.engNao.map(norm));
+  for (const r of os) { r.v = vi.has(norm(r.s)); r.e = st.has(norm(r.s)); r.i = r.e && (r.ad !== undefined ? norm(r.ad).includes(im) : r.i); }
   for (const b of base.values()) {
     if (b.fr !== undefined) b.f = !norm(b.fr) ? "SEM" : norm(b.fr).includes(pad) ? "PAD" : "IND";
     if (b.engv !== undefined) b.eng = !nao.has(norm(b.engv));
@@ -343,7 +344,7 @@ $("fNc").onchange = (e) => { F.nc = e.target.checked; desenha(); };
 $("limpar").onclick = () => { F.ini = F.fim = ""; F.cid.clear(); F.tipo.clear(); F.nc = false; $("fNc").checked = false; if (D) { montaFiltros(); desenha(); } };
 const cidOk = (c) => !F.cid.size || F.cid.has((c || "").trim());
 const tipoOk = (f) => !F.tipo.size || F.tipo.has(f || "SEM");
-const osFiltradas = () => D.os.filter((r) => (!F.ini || r.mes >= F.ini) && (!F.fim || r.mes <= F.fim) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
+const osFiltradas = () => D.os.filter((r) => r.v && (!F.ini || r.mes >= F.ini) && (!F.fim || r.mes <= F.fim) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
 const baseFiltrada = () => [...D.base.values()].filter((b) => cidOk(b.c) && tipoOk(b.f));
 
 /* ================= abas ================= */
@@ -516,11 +517,11 @@ function csvOS() { baixaCSV("painel_esgoto_os_cruzadas.csv", ["Recurso", "Grupo"
 
 /* ================= aba Dados ================= */
 let BUSCA_REC = "";
-function recursos() { const m = new Map(); if (D) for (const r of D.os) { if (!r.r) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
+function recursos() { const m = new Map(); if (D) for (const r of D.os) { if (!r.r || !r.v) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
 function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
   const fim = D.os.map((r) => r.d).filter(Boolean).sort().pop(); const dI = new Date(fim + "T00:00:00"); dI.setDate(dI.getDate() - 6); const ini = dI.toISOString().slice(0, 10);
-  const L = D.os.filter((r) => r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
+  const L = D.os.filter((r) => r.v && r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
   const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.eqDias)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
   const ruas = situacaoRuas().filter((r) => r.falta.length).slice(0, 5);
   return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
@@ -560,7 +561,7 @@ function abaDados() {
     <p class="status" style="color:var(--muted)">A seleção fica guardada neste navegador.</p></div></details>
   <details><summary>Downloads</summary><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-m3="csv-os">⬇ OS cruzadas com a base</button><button class="btn" data-m3="csv-ruas">⬇ Logradouros</button><button class="btn" data-m3="csv-rec">⬇ Recursos e grupos</button></div></details>
   <details><summary>Como foi calculado · Produtividade</summary><div><ul class="av">
-    <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b>, dentro dos filtros de mês, cidade e tipo.</li>
+    <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b> e status de visita (padrão: Visitada, Finalizada, Encerrada com Ocorrência), dentro dos filtros de mês, cidade e tipo. Paralisada e outros status ficam fora.</li>
     <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
     <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
@@ -575,11 +576,11 @@ function abaDados() {
 }
 function regrasHTML() {
   const R = RG(), stDados = D ? [...new Set(D.os.map((r) => r.s).filter(Boolean))] : [];
-  const stTodos = [...new Map([...R.status, ...stDados].map((x) => [norm(x), x])).values()].sort();
-  const marc = new Set(R.status.map(norm));
+  const stTodos = [...new Map([...R.visita, ...R.status, ...stDados].map((x) => [norm(x), x])).values()].sort();
+  const marc = new Set(R.status.map(norm)), marcV = new Set(R.visita.map(norm));
   const bloco = (n, t, corpo) => `<div style="border-left:3px solid var(--cyan);padding:6px 12px;margin:10px 0"><div style="font-weight:700;color:var(--marinho)">${n}. ${t}</div><div style="margin-top:4px">${corpo}</div></div>`;
   const inp = (id, v, w = 320) => `<input class="busca" id="${id}" value="${esc(v)}" style="min-width:0;width:min(${w}px,100%)">`;
-  return bloco(1, "Visita (entra na conta)", `OS com Código/Descrição contendo <b>${esc(R.codigo)}</b>. As outras OS são ignoradas na leitura. <span style="color:var(--muted)">(muda em pacote/regras.json)</span>`)
+  return bloco(1, "Visita (entra na conta)", `OS com Código/Descrição contendo <b>${esc(R.codigo)}</b>. As outras OS são ignoradas na leitura. <span style="color:var(--muted)">(muda em pacote/regras.json)</span><div style="margin-top:6px">Status da Atividade que contam como <b>visita</b>:</div><div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px">${stTodos.map((x) => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="rgVi" value="${esc(x)}" ${marcV.has(norm(x)) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Os status desmarcados (ex.: Paralisada, Cancelada) ficam fora de visitas, dias trabalhados e produtividade. Status marcados como executada contam sempre como visita.</div>`)
     + bloco(2, "OS executada (produtividade)", `Status da Atividade que contam como executada:<div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px">${stTodos.map((x) => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="rgSt" value="${esc(x)}" ${marc.has(norm(x)) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Produtividade = executadas ÷ visitas. A lista mostra os status encontrados nas planilhas.</div>`)
     + bloco(3, "Meta de produtividade", `${inp("rgMeta", Math.round(R.meta * 1000) / 10, 80)} % — abaixo disso fica em laranja.`)
     + bloco(4, "Implantação (OS)", `${R.impl ? "OS executada cuja coluna <b>Serviço adicionais resposta</b> contém o texto abaixo." : "<b>Toda OS executada conta como implantação.</b>"} Para exigir um texto em <b>Serviço adicionais resposta</b>, escreva aqui (vazio = toda executada): ${inp("rgImpl", R.impl)}<div style="color:var(--muted);font-size:12px">Maiúsculas e acentos não importam.</div>`)
@@ -592,7 +593,7 @@ function ligaRegras() {
   const a = $("rgAplica"); if (!a) return;
   a.onclick = () => {
     const meta = parseFloat(String($("rgMeta").value).replace(",", ".")) / 100;
-    AJ = { v: 2, status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
+    AJ = { v: 2, visita: [...document.querySelectorAll(".rgVi:checked")].map((x) => x.value), status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
       engNao: $("rgEng").value.split(",").map((x) => x.trim()).map((x) => /^\(?vazio\)?$/i.test(x) ? "" : x), meta: isFinite(meta) && meta > 0 ? meta : RG().meta };
     if (!AJ.engNao.includes("")) AJ.engNao.push("");
     try { localStorage.setItem("regrasPainel", JSON.stringify(AJ)); } catch (e) {}
