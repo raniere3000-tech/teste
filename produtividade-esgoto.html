@@ -127,7 +127,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v15</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v16</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -167,7 +167,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v15-20261117";
+const VERSAO_SITE = "v16-20261117";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -384,7 +384,7 @@ let LAT = null;
 function abreLateral(titulo, linhas) {
   LAT = { titulo, linhas };
   $("latTit").textContent = `${titulo} (${linhas.length.toLocaleString("pt-BR")})`;
-  $("latCorpo").innerHTML = `<table><thead><tr><th>Matrícula</th><th>Cliente</th><th>Logradouro</th><th>Fat.</th><th>Situação</th></tr></thead><tbody>${linhas.slice(0, 3000).map((l) => `<tr><td>${esc(l.m)}</td><td>${esc(l.cl)}</td><td>${esc(l.rua)}</td><td>${l.f ? `<span class="tag ${l.f}">${l.f === "IND" ? "Fat. ind." : l.f === "PAD" ? "Padron." : "s/ info"}</span>` : ""}</td><td>${esc(l.sit)}</td></tr>`).join("")}</tbody></table>${linhas.length > 3000 ? "<p>Mostrando 3.000. Baixe o CSV para ver tudo.</p>" : ""}`;
+  $("latCorpo").innerHTML = `<table><thead><tr><th>Matrícula</th><th>Cliente</th><th>Logradouro</th><th>Subcategoria</th><th>Fat.</th><th>Situação</th></tr></thead><tbody>${linhas.slice(0, 3000).map((l) => `<tr><td>${esc(l.m)}</td><td>${esc(l.cl)}</td><td>${esc(l.rua)}</td><td>${esc(l.sub || "")}</td><td>${l.f ? `<span class="tag ${l.f}">${l.f === "IND" ? "Fat. ind." : l.f === "PAD" ? "Padron." : "s/ info"}</span>` : ""}</td><td>${esc(l.sit)}</td></tr>`).join("")}</tbody></table>${linhas.length > 3000 ? "<p>Mostrando 3.000. Baixe o CSV para ver tudo.</p>" : ""}`;
   $("lateral").classList.add("on");
 }
 const fechaLateral = () => $("lateral").classList.remove("on");
@@ -392,8 +392,8 @@ $("latX").onclick = fechaLateral;
 document.addEventListener("keydown", (e) => e.key === "Escape" && fechaLateral());
 document.addEventListener("mousedown", (e) => { if ($("lateral").classList.contains("on") && !$("lateral").contains(e.target) && !e.target.closest(".lk")) fechaLateral(); });
 $("latCsv").onclick = () => LAT && baixaCSV(`painel_esgoto_lista.csv`, CAB_DET, LAT.linhas.map((l) => l.base ? linhaDet(l.base, l.sit) : linhaDet({ m: l.m, cl: l.cl, rua: l.rua, f: l.f, fr: l.fr, sit: "", b: "", c: "" }, l.sit)));
-const linhaOS = (r) => ({ m: r.m, cl: r.B?.cl || r.cl, rua: r.B?.rua || r.en, f: r.B?.f || "", fr: r.B?.fr || "", sit: `${r.s} · ${dataBR(r.d)} · ${r.r}` });
-const linhaBase = (b, sit) => ({ m: b.m, cl: b.cl, rua: b.rua, f: b.f, fr: b.fr, sit, base: b });
+const linhaOS = (r) => ({ sub: r.B?.sub || "", m: r.m, cl: r.B?.cl || r.cl, rua: r.B?.rua || r.en, f: r.B?.f || "", fr: r.B?.fr || "", sit: `${r.s} · ${dataBR(r.d)} · ${r.r}` });
+const linhaBase = (b, sit) => ({ sub: b.sub || "", m: b.m, cl: b.cl, rua: b.rua, f: b.f, fr: b.fr, sit, base: b });
 const CLIQUES = new Map(); let nClique = 0;
 const lk = (n, titulo, fn) => { if (!n) return `<td class="n">-</td>`; const id = "c" + (nClique++); CLIQUES.set(id, () => abreLateral(titulo, fn())); return `<td class="n lk" data-c="${id}">${num(n)}</td>`; };
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-c]"); if (t && CLIQUES.has(t.dataset.c)) CLIQUES.get(t.dataset.c)(); });
