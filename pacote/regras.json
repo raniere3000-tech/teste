@@ -31,8 +31,7 @@
     },
     "codigo_alvo": "SONDAGEM DE REDE DE ESGOTO",
     "status_executada": [
-      "Finalizada",
-      "Encerrada com Ocorrência"
+      "Finalizada"
     ],
     "implantacao": "",
     "implantacao_obs": "vazio = toda OS executada conta como implantação",

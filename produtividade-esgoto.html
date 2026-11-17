@@ -127,7 +127,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v12</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v13</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -167,7 +167,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v12-20261117";
+const VERSAO_SITE = "v13-20261117";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -197,13 +197,13 @@ let REGRAS = { meta_produtividade: 0.7, prefixo_bases_geradas: "painel_esgoto_",
 const regrasProntas = fetch("pacote/regras.json?v=" + VERSAO_SITE).then((r) => r.json()).then((j) => REGRAS = j).catch(() => {});
 const CLS = () => REGRAS.classes_faturamento;
 let AJ = {}; try { AJ = JSON.parse(localStorage.getItem("regrasPainel") || "{}"); } catch (e) {}
-if (AJ.v !== 2) { delete AJ.impl; AJ.v = 2; if (Object.keys(AJ).length === 1) AJ = {}; }
+if (AJ.v !== 3) { delete AJ.impl; delete AJ.status; AJ.v = 3; if (Object.keys(AJ).length === 1) AJ = {}; }
 function RG() {
   const o = REGRAS.os || {}, b = REGRAS.base || {};
   return {
     codigo: o.codigo_alvo || "SONDAGEM DE REDE DE ESGOTO",
     visita: AJ.visita ?? o.status_visita ?? ["VISITADA", "FINALIZADA", "ENCERRADA COM OCORRENCIA"],
-    status: AJ.status ?? o.status_executada ?? ["FINALIZADA", "ENCERRADA COM OCORRENCIA"],
+    status: AJ.status ?? o.status_executada ?? ["FINALIZADA"],
     impl: AJ.impl ?? o.implantacao ?? "",
     meta: AJ.meta ?? REGRAS.meta_produtividade ?? 0.7,
     pad: AJ.pad ?? b.faturamento_padronizacao_contem ?? "ESGOTO",
@@ -446,7 +446,7 @@ function abaProd() {
 }
 function cardGrupo(g, o) {
   const meta = RG().meta;
-  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada ou Encerrada com Ocorrência. Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Produtividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
   const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex);
   const T = resumo(o.L);
@@ -600,7 +600,7 @@ function abaDados() {
   <details open id="detRegras"><summary>Regras do painel ${Object.keys(AJ).length ? '<span class="tag at">ajustadas neste navegador</span>' : '<span class="tag ok">padrão</span>'}</summary><div>${regrasHTML()}</div></details>
   <details ${avisos.length ? "open" : ""}><summary>Avisos (${avisos.length})</summary><div>${avisos.length ? `<ul class="av">${avisos.map((a) => `<li><span class="tag at">atenção</span> ${esc(a)}</li>`).join("")}</ul>` : '<span class="tag ok">Tudo certo</span>'}</div></details>
   <details><summary>Conferência</summary><div>${D ? `<table><tbody>
-    <tr><td>OS de sondagem lidas</td><td class="n">${num(D.os.length)}</td></tr><tr><td>Executadas (Finalizada + Encerrada c/ ocorrência)</td><td class="n">${num(T.ex)}</td></tr>
+    <tr><td>OS de sondagem lidas</td><td class="n">${num(D.os.length)}</td></tr><tr><td>Executadas (${esc(RG().status.join(" + "))})</td><td class="n">${num(T.ex)}</td></tr>
     <tr><td>Com implantação de ligação</td><td class="n">${num(T.im)}</td></tr><tr><td>OS sem matrícula na base</td><td class="n">${num(semBase.length)}</td></tr>
     <tr><td>Ligações na base</td><td class="n">${num(D.base.size)}</td></tr><tr><td>Ligações marcadas em "Engenharia execução"</td><td class="n">${num([...D.base.values()].filter((b) => b.eng).length)}</td></tr>
     ${Object.entries(CLS()).map(([k, l]) => `<tr><td>Base · ${esc(l)}</td><td class="n">${num([...D.base.values()].filter((b) => b.f === k).length)}</td></tr>`).join("")}
@@ -613,7 +613,7 @@ function abaDados() {
   <details><summary>Downloads</summary><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-m3="csv-os">⬇ OS cruzadas com a base</button><button class="btn" data-m3="csv-ruas">⬇ Logradouros</button><button class="btn" data-m3="csv-rec">⬇ Recursos e grupos</button></div></details>
   <details><summary>Como foi calculado · Produtividade</summary><div><ul class="av">
     <li>Entram só as OS com Código/Descrição <b>SONDAGEM DE REDE DE ESGOTO</b> e status de visita (padrão: Visitada, Finalizada, Encerrada com Ocorrência), dentro dos filtros de mês, data, cidade e tipo. Paralisada e outros status ficam fora.</li>
-    <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada ou Encerrada com Ocorrência.</li>
+    <li><b>Visitas</b> = total dessas OS. <b>Executadas</b> = status Finalizada. Encerrada com Ocorrência e Visitada contam como visita, mas não como executada.</li>
     <li><b>Produtividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
     <li><b>Dias trabalhados</b> = dias diferentes (coluna Data) com pelo menos uma OS. Por equipe: dias daquela equipe. No total: soma dos dias de cada equipe (equipe-dia). <b>Exec./dia</b> = executadas ÷ dias trabalhados.</li>
@@ -644,7 +644,7 @@ function ligaRegras() {
   const a = $("rgAplica"); if (!a) return;
   a.onclick = () => {
     const meta = parseFloat(String($("rgMeta").value).replace(",", ".")) / 100;
-    AJ = { v: 2, visita: [...document.querySelectorAll(".rgVi:checked")].map((x) => x.value), status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
+    AJ = { v: 3, visita: [...document.querySelectorAll(".rgVi:checked")].map((x) => x.value), status: [...document.querySelectorAll(".rgSt:checked")].map((x) => x.value), impl: $("rgImpl").value.trim(), pad: $("rgPad").value.trim(),
       engNao: $("rgEng").value.split(",").map((x) => x.trim()).map((x) => /^\(?vazio\)?$/i.test(x) ? "" : x), meta: isFinite(meta) && meta > 0 ? meta : RG().meta };
     if (!AJ.engNao.includes("")) AJ.engNao.push("");
     try { localStorage.setItem("regrasPainel", JSON.stringify(AJ)); } catch (e) {}
