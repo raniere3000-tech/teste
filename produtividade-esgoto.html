@@ -127,7 +127,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v13</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v14</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -167,7 +167,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v13-20261117";
+const VERSAO_SITE = "v14-20261117";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -571,11 +571,17 @@ let BUSCA_REC = "";
 function recursos() { const m = new Map(); if (D) for (const r of D.os) { if (!r.r || !r.v) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
 function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
-  const fim = D.os.map((r) => r.d).filter(Boolean).sort().pop(); const dI = new Date(fim + "T00:00:00"); dI.setDate(dI.getDate() - 6); const ini = dI.toISOString().slice(0, 10);
-  const L = D.os.filter((r) => r.v && r.d >= ini && r.d <= fim && cidOk(r.c || r.B?.c));
+  // período: o filtrado (Data/Mês) ou os últimos 7 dias até a data mais recente COM VISITA (nunca depois de hoje)
+  const hoje = new Date().toISOString().slice(0, 10), base = osFiltradas().filter((r) => r.d && r.d <= hoje);
+  const datas = base.map((r) => r.d).sort();
+  if (!datas.length) return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">Nenhuma visita no período/filtros selecionados.</div></div>`;
+  let ini, fim = datas[datas.length - 1], titulo = "Reporte semanal";
+  if (F.dia.size || F.mes.size) { ini = datas[0]; titulo = "Reporte do período"; }
+  else { const dI = new Date(fim + "T12:00:00"); dI.setDate(dI.getDate() - 6); ini = dI.toISOString().slice(0, 10); }
+  const L = base.filter((r) => r.d >= ini && r.d <= fim);
   const lin = (g) => { const R = resumo(L.filter((r) => grupo(r.r) === g)); const eq = new Set(L.filter((r) => grupo(r.r) === g).map((r) => r.r)).size; return `<tr><td>${GN[g]}</td><td class="n">${num(eq)}</td><td class="n">${num(R.eqDias)}</td><td class="n">${num(R.vis)}</td><td class="n">${num(R.ex)}</td><td class="n ${R.vis && R.prod < RG().meta ? "low" : ""}">${pct(R.prod)}</td><td class="n">${num(R.im)}</td></tr>`; };
   const ruas = situacaoRuas().filter((r) => r.falta.length).slice(0, 5);
-  return `<div class="reporte" id="reporte"><h3>Reporte semanal · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
+  return `<div class="reporte" id="reporte"><h3>${titulo} · Execução de esgoto</h3><div class="sub">${dataBR(ini)} a ${dataBR(fim)} · ÁGUAS DO RIO</div>
   <table><thead><tr><th>Grupo</th><th class="n">Equipes</th><th class="n">Equipe-dia</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Prod.</th><th class="n">Implantação</th></tr></thead><tbody>${lin("eng")}${lin("srv")}</tbody></table>
   ${ruas.length ? `<h4 style="margin:12px 0 4px;color:#394D73">Ruas com mais ligações faltando</h4><table><thead><tr><th>Logradouro</th><th class="n">Ligações</th><th class="n">Feitas</th><th class="n">Faltam</th></tr></thead><tbody>${ruas.map((r) => `<tr><td>${esc(r.rua)}</td><td class="n">${num(r.tot)}</td><td class="n">${num(r.feitas)}</td><td class="n low">${num(r.falta.length)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`;
 }
@@ -596,7 +602,7 @@ function abaDados() {
     ...ausentes.map((a) => `${a.arquivo}: colunas não encontradas → ${a.info.colunas_ausentes.join(", ")}`),
   ].filter(Boolean);
   const T = D ? resumo(D.os) : null;
-  return `<div class="card"><div class="card-h"><h2>Reporte semanal</h2>${help("Últimos 7 dias da planilha (contados a partir da data mais recente das OS). Respeita o filtro de Cidade. Use 📋 Copiar imagem e cole no WhatsApp, e-mail ou Teams.")}<div class="dir"><button class="btn pri" id="copiaImg">📋 Copiar imagem</button></div></div>${reporte()}</div>
+  return `<div class="card"><div class="card-h"><h2>Reporte semanal</h2>${help("Últimos 7 dias até a data mais recente que tem visita (OS com data futura, pendente ou paralisada não contam). Se houver Data ou Mês selecionado nos filtros, usa esse período. Respeita todos os filtros. Use 📋 Copiar imagem e cole no WhatsApp, e-mail ou Teams.")}<div class="dir"><button class="btn pri" id="copiaImg">📋 Copiar imagem</button></div></div>${reporte()}</div>
   <details open id="detRegras"><summary>Regras do painel ${Object.keys(AJ).length ? '<span class="tag at">ajustadas neste navegador</span>' : '<span class="tag ok">padrão</span>'}</summary><div>${regrasHTML()}</div></details>
   <details ${avisos.length ? "open" : ""}><summary>Avisos (${avisos.length})</summary><div>${avisos.length ? `<ul class="av">${avisos.map((a) => `<li><span class="tag at">atenção</span> ${esc(a)}</li>`).join("")}</ul>` : '<span class="tag ok">Tudo certo</span>'}</div></details>
   <details><summary>Conferência</summary><div>${D ? `<table><tbody>
