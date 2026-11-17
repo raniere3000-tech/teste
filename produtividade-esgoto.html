@@ -127,7 +127,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v14</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v15</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -167,7 +167,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v14-20261117";
+const VERSAO_SITE = "v15-20261117";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -184,6 +184,7 @@ const mesCurto = (ym) => ym ? `${MESES[+ym.slice(5, 7) - 1].slice(0, 3)}/${ym.sl
 const dataBR = (iso) => iso ? iso.split("-").reverse().join("/") : "";
 const help = (t) => `<span class="help">?<span class="tip">${t}</span></span>`;
 let toastT;
+window.addEventListener("error", (e) => toast("Erro no painel: " + e.message, true));
 function toast(t, erro) { const el = $("toast"); el.textContent = t; el.className = "toast on" + (erro ? " erro" : ""); clearTimeout(toastT); toastT = setTimeout(() => el.className = "toast", 4500); }
 function baixaCSV(nome, cab, linhas) {
   const q = (v) => { const s = String(v ?? ""); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -428,9 +429,21 @@ function desenha() {
   CLIQUES.clear(); nClique = 0;
   if (D) { const ms = [...F.mes].sort(), ds = [...F.dia].sort();
     const p = ds.length ? ` — ${ds.length === 1 ? dataBR(ds[0]) : ds.length + " datas (" + dataBR(ds[0]) + " a " + dataBR(ds[ds.length - 1]) + ")"}` : ms.length ? ` — ${ms.length <= 2 ? ms.map(mesLongo).join(" e ") : ms.length + " meses"}` : ""; $("titulo").textContent = "Produtividade · Execução de Esgoto" + p; }
-  if (ABA === "prod") $("a-prod").innerHTML = D ? abaProd() : vazio();
-  if (ABA === "ruas") { $("a-ruas").innerHTML = D ? abaRuas() : vazio(); ligaBuscaRuas(); }
-  if (ABA === "dados") { $("a-dados").innerHTML = abaDados(); ligaDados(); }
+  const tenta = (id, fn) => { try { fn(); } catch (e) { console.error(e); $(id).innerHTML = `<div class="card vazio" style="text-align:left"><b style="color:#9a3412">Erro ao montar esta aba</b>Mande um print desta mensagem:<pre style="white-space:pre-wrap;font-size:12px;background:#ffedd5;color:#9a3412;padding:8px;border-radius:6px">${esc(VERSAO_SITE + " · " + (e && e.stack || e))}</pre></div>`; } };
+  if (ABA === "prod") tenta("a-prod", () => $("a-prod").innerHTML = D ? diagProd() + abaProd() : vazio());
+  if (ABA === "ruas") tenta("a-ruas", () => { $("a-ruas").innerHTML = D ? abaRuas() : vazio(); ligaBuscaRuas(); });
+  if (ABA === "dados") tenta("a-dados", () => { $("a-dados").innerHTML = abaDados(); ligaDados(); });
+}
+// avisa por que a aba Produtividade pode estar vazia
+function diagProd() {
+  const av = [], tot = D.os.length, vis = D.os.filter((r) => r.v).length, filt = osFiltradas();
+  const st = [...new Set(D.os.map((r) => r.s))].filter(Boolean);
+  if (!tot) av.push("Nenhuma OS de SONDAGEM DE REDE DE ESGOTO foi lida. Veja em Dados → Bases carregadas se a planilha de OS foi reconhecida.");
+  else if (!vis) av.push(`Nenhuma OS tem status de visita. Status encontrados: ${st.join(", ")}. Ajuste em Dados → Regras (item 1).`);
+  else if (!filt.length) av.push("Os filtros selecionados (Mês, Data, Cidade ou Tipo) não deixaram nenhuma visita. Clique em Limpar filtros.");
+  else if (!F.nc && !filt.some((r) => grupo(r.r) !== "nc")) av.push(`Nenhum recurso está marcado como Engenharia ou Serviços (${new Set(filt.map((r) => r.r)).size} recursos sem grupo). Marque em Dados → Recursos, ou ligue “Mostrar recursos não classificados”.`);
+  else { const nc = new Set(filt.filter((r) => grupo(r.r) === "nc").map((r) => r.r)).size; if (nc && !F.nc) av.push(`${nc} recurso(s) sem grupo não aparecem nas contas. Marque em Dados → Recursos.`); }
+  return av.map((a) => `<div class="card" style="background:#ffedd5;border-color:#f59e0b;color:#9a3412;padding:10px 14px">⚠ ${esc(a)}</div>`).join("");
 }
 function kpi(rot, val, sub = "", alerta = false) { return `<div class="kpi ${alerta ? "alerta" : ""}"><span>${rot}</span><b class="${alerta ? "low" : ""}">${val}</b>${sub ? `<small>${sub}</small>` : ""}</div>`; }
 
