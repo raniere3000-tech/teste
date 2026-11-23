@@ -74,6 +74,8 @@ main{padding:16px;max-width:1560px;margin:auto}
 /* tabelas */
 .tw{overflow:auto;max-height:480px}
 table{width:100%;border-collapse:collapse;font-family:'IBM Plex Sans Condensed','Segoe UI',Arial,sans-serif;font-size:12.5px}
+th .seta{font-size:10px;margin-left:3px;color:#9fe1e7}
+th:hover{background:var(--azul)}
 th{background:var(--marinho);color:#fff;text-align:left;padding:7px 6px;position:sticky;top:0;white-space:nowrap;z-index:1;cursor:pointer}
 td{padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 tr:nth-child(even) td{background:var(--zebra)}
@@ -127,7 +129,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v17</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v18</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -167,7 +169,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v17-20261119";
+const VERSAO_SITE = "v18-20261123";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -384,8 +386,8 @@ let LAT = null;
 function abreLateral(titulo, linhas) {
   LAT = { titulo, linhas };
   $("latTit").textContent = `${titulo} (${linhas.length.toLocaleString("pt-BR")})`;
-  $("latCorpo").innerHTML = `<table><thead><tr><th>Matrícula</th><th>Cliente</th><th>Logradouro</th><th>Subcategoria</th><th>Fat.</th><th>Situação</th></tr></thead><tbody>${linhas.slice(0, 3000).map((l) => `<tr><td>${esc(l.m)}</td><td>${esc(l.cl)}</td><td>${esc(l.rua)}</td><td>${esc(l.sub || "")}</td><td>${l.f ? `<span class="tag ${l.f}">${l.f === "IND" ? "Fat. ind." : l.f === "PAD" ? "Padron." : "s/ info"}</span>` : ""}</td><td>${esc(l.sit)}</td></tr>`).join("")}</tbody></table>${linhas.length > 3000 ? "<p>Mostrando 3.000. Baixe o CSV para ver tudo.</p>" : ""}`;
-  $("lateral").classList.add("on");
+  $("latCorpo").innerHTML = `<table id="tLat"><thead><tr><th>Matrícula</th><th>Cliente</th><th>Logradouro</th><th>Subcategoria</th><th>Fat.</th><th>Situação</th></tr></thead><tbody>${linhas.slice(0, 3000).map((l) => `<tr><td>${esc(l.m)}</td><td>${esc(l.cl)}</td><td>${esc(l.rua)}</td><td>${esc(l.sub || "")}</td><td>${l.f ? `<span class="tag ${l.f}">${l.f === "IND" ? "Fat. ind." : l.f === "PAD" ? "Padron." : "s/ info"}</span>` : ""}</td><td>${esc(l.sit)}</td></tr>`).join("")}</tbody></table>${linhas.length > 3000 ? "<p>Mostrando 3.000. Baixe o CSV para ver tudo.</p>" : ""}`;
+  $("lateral").classList.add("on"); reordena();
 }
 const fechaLateral = () => $("lateral").classList.remove("on");
 $("latX").onclick = fechaLateral;
@@ -397,6 +399,33 @@ const linhaBase = (b, sit) => ({ sub: b.sub || "", m: b.m, cl: b.cl, rua: b.rua,
 const CLIQUES = new Map(); let nClique = 0;
 const lk = (n, titulo, fn) => { if (!n) return `<td class="n">-</td>`; const id = "c" + (nClique++); CLIQUES.set(id, () => abreLateral(titulo, fn())); return `<td class="n lk" data-c="${id}">${num(n)}</td>`; };
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-c]"); if (t && CLIQUES.has(t.dataset.c)) CLIQUES.get(t.dataset.c)(); });
+
+/* ================= ordenar tabelas (clique no cabeçalho) ================= */
+const ORD = {};                                   // chave da tabela -> { col, dir }
+const chaveTab = (t) => t.id || [...t.querySelectorAll("thead th")].map((th) => th.dataset.rot ?? th.textContent).join("|");
+function valorCel(td) {
+  const t = (td?.textContent || "").trim();
+  if (t === "-" || t === "") return { n: 0, t: "" };
+  if (/^-?[\d.]+(,\d+)?%?$/.test(t.split(" ").pop())) return { n: parseFloat(t.split(" ").pop().replace(/\./g, "").replace(",", ".").replace("%", "")), t };
+  const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (m) return { n: +(m[3] + m[2] + m[1]), t };
+  return { n: null, t };
+}
+function ordena(t) {
+  const o = ORD[chaveTab(t)]; const tb = t.tBodies[0]; if (!o || !tb) return;
+  t.querySelectorAll("thead th").forEach((th, i) => { th.dataset.rot ??= th.textContent; th.innerHTML = esc(th.dataset.rot) + (i === o.col ? `<span class="seta">${o.dir < 0 ? "▼" : "▲"}</span>` : ""); });
+  const linhas = [...tb.rows].filter((r) => !r.classList.contains("tot")), tot = [...tb.rows].filter((r) => r.classList.contains("tot"));
+  linhas.sort((a, b) => { const x = valorCel(a.cells[o.col]), y = valorCel(b.cells[o.col]);
+    const r = x.n !== null && y.n !== null ? x.n - y.n : x.t.localeCompare(y.t, "pt-BR", { numeric: true }); return r * o.dir; });
+  tb.append(...linhas, ...tot);
+}
+const reordena = () => document.querySelectorAll("table").forEach((t) => ORD[chaveTab(t)] && ordena(t));
+document.addEventListener("click", (e) => {
+  const th = e.target.closest("thead th"); if (!th) return; const t = th.closest("table"); if (!t.tBodies[0]) return;
+  const col = th.cellIndex, k = chaveTab(t), o = ORD[k];
+  if ((th.dataset.rot ?? th.textContent).trim() === "") return;
+  ORD[k] = { col, dir: o && o.col === col ? -o.dir : -1 };   // 1º clique: maior → menor
+  ordena(t);
+});
 
 /* ================= cálculos ================= */
 function porGrupo(L) {
@@ -433,6 +462,7 @@ function desenha() {
   if (ABA === "prod") tenta("a-prod", () => $("a-prod").innerHTML = D ? diagProd() + abaProd() : vazio());
   if (ABA === "ruas") tenta("a-ruas", () => { $("a-ruas").innerHTML = D ? abaRuas() : vazio(); ligaBuscaRuas(); });
   if (ABA === "dados") tenta("a-dados", () => { $("a-dados").innerHTML = abaDados(); ligaDados(); });
+  reordena();
 }
 // avisa por que a aba Produtividade pode estar vazia
 function diagProd() {
@@ -522,7 +552,7 @@ let BUSCA_RUA = "";
 function abaRuas() {
   const R = situacaoRuas(); const t = R.reduce((s, r) => (s.tot += r.tot, s.f += r.feitas, s.fa += r.falta.length, s.fi += r.faltaInd, s.c += r.falta.length === 0 ? 1 : 0, s), { tot: 0, f: 0, fa: 0, fi: 0, c: 0 });
   let h = `<div class="kpis">${kpi("Logradouros", num(R.length))}${kpi("Ligações na base", num(t.tot))}${kpi("Feitas", num(t.f))}${kpi("Faltam", num(t.fa), "", t.fa > 0)}${kpi("% concluído", pct(t.f / t.tot))}${kpi("Ruas concluídas", num(t.c))}${kpi("Previsão fat. indireto", num(t.fi), "faltam e só pagam água")}</div>`;
-  h += `<div class="card"><div class="card-h"><h2>Execução por logradouro</h2>${help("Cruza a Matrícula das OS com o NUM_LIGACAO da base. Feita = coluna Engenharia execução preenchida na base, ou OS executada com implantação de ligação (todo o período, sem o filtro de mês). Fat. indireto = TIPO_FATURAMENTO só água (ligação nova gera receita de esgoto). Padronização = já fatura água e esgoto. Clique num número para ver os clientes.")}<div class="dir"><input class="busca" id="bRua" placeholder="Buscar logradouro…" value="${esc(BUSCA_RUA)}"><button class="btn" data-m2="csv-ruas">⬇ CSV</button></div></div>
+  h += `<div class="card"><div class="card-h"><h2>Execução por logradouro</h2>${help("Cruza a Matrícula das OS com o NUM_LIGACAO da base. Feita = coluna Engenharia execução preenchida na base, ou OS executada com implantação de ligação (todo o período, sem o filtro de mês). Fat. indireto = TIPO_FATURAMENTO só água (ligação nova gera receita de esgoto). Padronização = já fatura água e esgoto. Clique num número para ver os clientes. Clique no título de uma coluna para ordenar (1º clique: maior → menor; 2º: menor → maior).")}<div class="dir"><input class="busca" id="bRua" placeholder="Buscar logradouro…" value="${esc(BUSCA_RUA)}"><button class="btn" data-m2="csv-ruas">⬇ CSV</button></div></div>
   <div class="tw" style="max-height:600px"><table id="tRuas"><thead><tr><th>Logradouro</th><th>Bairro</th><th>Cidade</th><th class="n">Ligações</th><th class="n">Fat. ind.</th><th class="n">Padron.</th><th class="n">Eng. (base)</th><th class="n">Eng. (OS)</th><th class="n">Serviços</th><th class="n">Feitas</th><th class="n">Faltam</th><th class="n">Faltam fat. ind.</th><th>% concluído</th></tr></thead><tbody>
   ${R.map((r) => { const p = r.tot ? r.feitas / r.tot : 0; const n = r.rua; return `<tr data-rua="${esc(norm(r.rua))}"><td>${esc(r.rua)}</td><td>${esc(r.bairro)}</td><td>${esc(r.cid)}</td>${lk(r.tot, n + " · ligações", () => r.L.map((b) => linhaBase(b, b.sit)))}${lk(r.ind, n + " · fat. indireto", () => r.L.filter((b) => b.f === "IND").map((b) => linhaBase(b, b.sit)))}${lk(r.pad, n + " · padronização", () => r.L.filter((b) => b.f === "PAD").map((b) => linhaBase(b, b.sit)))}${lk(r.engB.length, n + " · engenharia (base)", () => r.engB.map((b) => linhaBase(b, "Engenharia (base)")))}${lk(r.engO.length, n + " · engenharia (OS)", () => r.engO.map((b) => linhaBase(b, "Engenharia (OS)")))}${lk(r.srv.length, n + " · serviços", () => r.srv.map((b) => linhaBase(b, "Serviços (OS)")))}${lk(r.feitas, n + " · feitas", () => [...r.engB, ...r.engO, ...r.srv].map((b) => linhaBase(b, "Feita")))}${r.falta.length ? lk(r.falta.length, n + " · faltam", () => r.falta.map((b) => linhaBase(b, "Falta"))).replace('class="n lk"', 'class="n lk low"') : `<td class="n ok">-</td>`}${lk(r.faltaInd, n + " · faltam (fat. indireto)", () => r.falta.filter((b) => b.f === "IND").map((b) => linhaBase(b, "Falta")))}<td><div class="bar"><i style="width:${Math.min(100, p * 100)}%"></i></div> ${pct(p)}</td></tr>`; }).join("")}
   </tbody><tfoot><tr class="tot"><td>Total</td><td></td><td></td>${totRuas(R)}<td>${pct(t.f / t.tot)}</td></tr></tfoot></table></div></div>`;
