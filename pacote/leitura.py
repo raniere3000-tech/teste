@@ -91,18 +91,22 @@ def _data_iso(v):
     return "" if pd.isna(d) else d.strftime("%Y-%m-%d")
 
 
-def _os(df):
+def _os(df, tc_arquivo=False):
     R = REGRAS["os"]
     C = {k: _col(df, v) for k, v in R["colunas"].items()}
     g = lambda row, k: str(row[C[k]]).strip() if C[k] else ""
     alvo = norm(R["codigo_alvo"])
     execs = {norm(s) for s in R["status_executada"]}
     impl = norm(R["implantacao"])
-    regs, fora = [], 0
+    kw_tc = [norm(x) for x in R.get("til_compartilhado_codigo_contem", ["COMPARTILHADO"])]
+    regs, fora, n_tc = [], 0, 0
     for _, row in df.iterrows():
-        if alvo not in norm(g(row, "codigo")):
+        cod = norm(g(row, "codigo"))
+        tc = tc_arquivo or any(k in cod for k in kw_tc)
+        if not tc and alvo not in cod:
             fora += 1
             continue
+        n_tc += 1 if tc else 0
         st = g(row, "status")
         e = norm(st) in execs
         regs.append({
@@ -110,10 +114,10 @@ def _os(df):
             "d": _data_iso(g(row, "data")), "c": g(row, "cidade"), "b": g(row, "bairro"),
             "en": g(row, "endereco"), "cl": g(row, "cliente"), "s": st,
             "e": e, "i": e and impl in norm(g(row, "adicionais")),
-            "cod": g(row, "codigo"), "ad": g(row, "adicionais"), "fim": g(row, "fim"),
+            "tc": tc, "cod": g(row, "codigo"), "ad": g(row, "adicionais"), "fim": g(row, "fim"),
         })
     faltando = [R["colunas"][k] for k, v in C.items() if v is None]
-    return regs, {"fora_do_codigo": fora, "colunas_ausentes": faltando}
+    return regs, {"fora_do_codigo": fora, "til_compartilhado": n_tc, "colunas_ausentes": faltando}
 
 
 def _base(df):
@@ -148,6 +152,8 @@ def le_arquivo(caminho, nome):
         abas = _brutas(caminho)
     except Exception as e:  # noqa: BLE001
         return {"arquivo": nome, "tipo": "nao_usado", "motivo": f"erro ao abrir: {e}", "registros": [], "linhas": 0}
+    nome_sp = norm(re.sub(r"[_\-.]+", " ", os.path.basename(nome)))
+    tc_arquivo = any(norm(t) in nome_sp or norm(t) in nome_sp.replace(" ", "") for t in REGRAS["os"].get("til_compartilhado_nome", ["TIL COMPARTILHADO"]))
     # tenta pelas colunas; o nome do arquivo decide a ordem de tentativa
     ordem = ["os", "base"]
     if any(norm(p) in base_nome for p in REGRAS["base"]["reconhece_nome"]) and not any(
@@ -159,7 +165,7 @@ def le_arquivo(caminho, nome):
             if i is None:
                 continue
             df = _monta(bruto, i)
-            regs, info = (_os if tipo == "os" else _base)(df)
+            regs, info = _os(df, tc_arquivo) if tipo == "os" else _base(df)
             info["aba"] = aba
             return {"arquivo": nome, "tipo": tipo, "registros": regs, "linhas": len(df), "info": info, "motivo": ""}
     obr = " / ".join(f"{REGRAS[t]['rotulo']}: {', '.join(REGRAS[t]['colunas_obrigatorias'])}" for t in ("os", "base"))

@@ -1,5 +1,5 @@
 {
-  "versao_leitura": 2,
+  "versao_leitura": 3,
   "prefixo_bases_geradas": "painel_esgoto_",
   "meta_produtividade": 0.7,
   "os": {
@@ -39,6 +39,15 @@
       "Visitada",
       "Finalizada",
       "Encerrada com Ocorrência"
+    ],
+    "til_compartilhado_nome": [
+      "TIL COMPARTILHADO",
+      "TILL COMPARTILHADO",
+      "TILCOMPARTILHADO",
+      "TILLCOMPARTILHADO"
+    ],
+    "til_compartilhado_codigo_contem": [
+      "COMPARTILHADO"
     ]
   },
   "base": {

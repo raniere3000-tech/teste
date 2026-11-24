@@ -86,7 +86,7 @@ td.lk{color:var(--blue);cursor:pointer;text-decoration:underline dotted}
 td.lk:hover{color:var(--navy)}
 .low{color:var(--laranja-texto);font-weight:600}
 td.ok{background:var(--ok-fundo)!important;color:var(--ok-texto);font-weight:600}
-.bar{height:6px;background:var(--op-trilho);border-radius:3px;min-width:70px}
+.bar{height:6px;background:var(--op-trilho);border-radius:3px;min-width:40px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#16a5b8,#7ee0bc);border-radius:3px}
 .bar.alerta i{background:var(--laranja)}
 .tag{padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
@@ -129,7 +129,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v18</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v19</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -169,7 +169,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v18-20261123";
+const VERSAO_SITE = "v19-20261124";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -309,18 +309,21 @@ let SEL = {}; try { SEL = JSON.parse(localStorage.getItem("selRecursos") || "{}"
 const grupo = (r) => SEL[norm(r)] || "nc";
 const GN = { eng: "Engenharia", srv: "Serviços", nc: "Não classificado" };
 function monta(ultima) {
-  const base = new Map(); const os = []; const vistos = new Set(); let dup = 0;
+  const base = new Map(); const todas = []; const vistos = new Map(); let dup = 0;
   for (const a of ultima.arquivos) {
     if (a.tipo === "base") for (const r of a.registros) base.set(r.m, r);
     if (a.tipo === "os") for (const r of a.registros) {
       const k = r.id ? "id:" + r.id : [r.r, r.m, r.d, r.s].join("|");
-      if (vistos.has(k)) { dup++; continue; } vistos.add(k); os.push(r);
+      if (vistos.has(k)) { dup++; const i = vistos.get(k); if (r.tc && !todas[i].tc) todas[i] = r; continue; }   // Till compartilhado prevalece
+      vistos.set(k, todas.length); todas.push(r);
     }
   }
-  aplicaRegras(os, base);
+  aplicaRegras(todas, base);
+  const tc = todas.filter((r) => r.tc), os = todas.filter((r) => !r.tc);
+  for (const r of tc) { r.B = base.get(r.m) || null; r.mes = (r.d || "").slice(0, 7); }
   const porMat = new Map();
   for (const r of os) { r.B = base.get(r.m) || null; r.mes = (r.d || "").slice(0, 7); if (r.m) { const l = porMat.get(r.m) || []; l.push(r); porMat.set(r.m, l); } }
-  D = { os, base, porMat, arquivos: ultima.arquivos, quando: ultima.quando, dup };
+  D = { os, tc, base, porMat, arquivos: ultima.arquivos, quando: ultima.quando, dup };
   montaFiltros(); desenha();
   $("status").textContent = `Última leitura: ${new Date(ultima.quando).toLocaleString("pt-BR")} · ${num(os.length)} OS de sondagem · ${num(base.size)} ligações na base`;
 }
@@ -365,6 +368,7 @@ $("fNc").onchange = (e) => { F.nc = e.target.checked; desenha(); };
 $("limpar").onclick = () => { F.mes.clear(); F.dia.clear(); F.cid.clear(); F.tipo.clear(); F.nc = false; $("fNc").checked = false; if (D) { montaFiltros(); desenha(); } };
 const cidOk = (c) => !F.cid.size || F.cid.has((c || "").trim());
 const tipoOk = (f) => !F.tipo.size || F.tipo.has(f || "SEM");
+const tcFiltrados = () => (D.tc || []).filter((r) => r.e && (!F.mes.size || F.mes.has(r.mes)) && (!F.dia.size || F.dia.has(r.d)) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
 const osFiltradas = () => D.os.filter((r) => r.v && (!F.mes.size || F.mes.has(r.mes)) && (!F.dia.size || F.dia.has(r.d)) && cidOk(r.c || r.B?.c) && tipoOk(r.B?.f));
 const baseFiltrada = () => [...D.base.values()].filter((b) => cidOk(b.c) && tipoOk(b.f));
 
@@ -428,13 +432,15 @@ document.addEventListener("click", (e) => {
 });
 
 /* ================= cálculos ================= */
-function porGrupo(L) {
+function porGrupo(L, TC = []) {
   const G = {};
-  for (const r of L) {
-    const g = grupo(r.r); if (g === "nc" && !F.nc) continue;
-    const o = G[g] ||= { rec: new Map(), L: [] }; o.L.push(r);
-    const x = o.rec.get(r.r) || { nome: r.r, L: [] }; x.L.push(r); o.rec.set(r.r, x);
-  }
+  const add = (r, campo) => {
+    const g = grupo(r.r); if (g === "nc" && !F.nc) return;
+    const o = G[g] ||= { rec: new Map(), L: [], tc: [] }; o[campo].push(r);
+    const x = o.rec.get(r.r) || { nome: r.r, L: [], tc: [] }; x[campo].push(r); o.rec.set(r.r, x);
+  };
+  for (const r of L) add(r, "L");
+  for (const r of TC) add(r, "tc");
   return G;
 }
 const resumo = (L) => { const ex = L.filter((r) => r.e), im = ex.filter((r) => r.i); const dias = new Set(L.map((r) => r.d).filter(Boolean)).size, eqDias = new Set(L.filter((r) => r.d).map((r) => r.r + "|" + r.d)).size; return { dias, eqDias, vis: L.length, ex: ex.length, im: im.length, ind: im.filter((r) => r.B?.f === "IND").length, pad: im.filter((r) => r.B?.f === "PAD").length, prod: L.length ? ex.length / L.length : 0, exL: ex, imL: im }; };
@@ -478,10 +484,10 @@ function diagProd() {
 function kpi(rot, val, sub = "", alerta = false) { return `<div class="kpi ${alerta ? "alerta" : ""}"><span>${rot}</span><b class="${alerta ? "low" : ""}">${val}</b>${sub ? `<small>${sub}</small>` : ""}</div>`; }
 
 function abaProd() {
-  const L = osFiltradas(), G = porGrupo(L), meta = RG().meta;
+  const L = osFiltradas(), TC = tcFiltrados(), G = porGrupo(L, TC), meta = RG().meta;
   const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo);
   const eq = (g) => G[g] ? [...G[g].rec.values()].length : 0;
-  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Efetividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
+  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Efetividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Till compartilhado", num(TC.filter((r) => F.nc || grupo(r.r) !== "nc").length), "executadas")}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
   const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
   h += `<div class="duas">${cards.join("")}</div>`;
   h += cardGrafMes(L);
@@ -489,13 +495,13 @@ function abaProd() {
 }
 function cardGrupo(g, o) {
   const meta = RG().meta;
-  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Efetividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Efetividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Till comp. = OS executadas (Finalizada) do arquivo de Till Compartilhado (ou com COMPARTILHADO no Código/Descrição); não entram em visitas nem na efetividade. Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
-  const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex);
+  const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex || b.tc.length - a.tc.length), ativos = recs.filter((x) => x.L.length).length;
   const T = resumo(o.L);
-  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}</tr>`;
-  return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(recs.length))}${kpi("Efetividade", pct(T.prod), "", T.prod < meta)}${kpi("Produtividade", num(T.ex / recs.length))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}</div>
-  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n">Efet.</th><th></th><th class="n">Implantação</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
+  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}${(() => { const T2 = tot ? o.tc : o.rec.get(nome).tc; return lk(T2.length, `${nome} · till compartilhado`, () => T2.map(linhaOS)); })()}</tr>`;
+  return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(ativos))}${kpi("Efetividade", pct(T.prod), "", T.prod < meta)}${kpi("Produtividade", num(T.ex / ativos))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}${kpi("Till compartilhado", num(o.tc.length))}</div>
+  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n">Efet.</th><th></th><th class="n">Implantação</th><th class="n" title="Till compartilhado">Till comp.</th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
 }
 let GRAF = "mes";                                   // "mes" | "dia"
 const SEM = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -611,7 +617,7 @@ function csvOS() { baixaCSV("painel_esgoto_os_cruzadas.csv", ["Recurso", "Grupo"
 
 /* ================= aba Dados ================= */
 let BUSCA_REC = "";
-function recursos() { const m = new Map(); if (D) for (const r of D.os) { if (!r.r || !r.v) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
+function recursos() { const m = new Map(); if (D) for (const r of [...D.os, ...(D.tc || [])]) { if (!r.r || !r.v) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
 function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
   // período: o filtrado (Data/Mês) ou os últimos 7 dias até a data mais recente COM VISITA (nunca depois de hoje)
@@ -654,7 +660,7 @@ function abaDados() {
     <tr><td>Ligações na base</td><td class="n">${num(D.base.size)}</td></tr><tr><td>Ligações marcadas em "Engenharia execução"</td><td class="n">${num([...D.base.values()].filter((b) => b.eng).length)}</td></tr>
     ${Object.entries(CLS()).map(([k, l]) => `<tr><td>Base · ${esc(l)}</td><td class="n">${num([...D.base.values()].filter((b) => b.f === k).length)}</td></tr>`).join("")}
     <tr><td>Status encontrados</td><td>${[...new Set(D.os.map((r) => r.s))].map(esc).join(" · ")}</td></tr></tbody></table>` : "Sem dados."}</div></details>
-  <details><summary>Bases carregadas (${arqs.length})</summary><div><table><thead><tr><th>Arquivo</th><th>Uso</th><th class="n">Linhas</th><th class="n">Usadas</th><th>Modificado</th><th>Motivo / observação</th></tr></thead><tbody>${arqs.map((a) => `<tr><td>${esc(a.arquivo)}</td><td>${a.tipo === "os" ? '<span class="tag ok">OS executadas</span>' : a.tipo === "base" ? '<span class="tag ok">Base de ligações</span>' : '<span class="tag at">não usado</span>'}</td><td class="n">${num(a.linhas)}</td><td class="n">${num(a.registros?.length)}</td><td>${a.modificado ? new Date(a.modificado).toLocaleDateString("pt-BR") : ""}</td><td>${esc(a.motivo || (a.info?.fora_do_codigo ? `${num(a.info.fora_do_codigo)} linhas de outros códigos ignoradas` : ""))}</td></tr>`).join("") || '<tr><td colspan="6">Nenhum arquivo.</td></tr>'}</tbody></table></div></details>
+  <details><summary>Bases carregadas (${arqs.length})</summary><div><table><thead><tr><th>Arquivo</th><th>Uso</th><th class="n">Linhas</th><th class="n">Usadas</th><th>Modificado</th><th>Motivo / observação</th></tr></thead><tbody>${arqs.map((a) => `<tr><td>${esc(a.arquivo)}</td><td>${a.tipo === "os" ? '<span class="tag ok">OS executadas</span>' : a.tipo === "base" ? '<span class="tag ok">Base de ligações</span>' : '<span class="tag at">não usado</span>'}</td><td class="n">${num(a.linhas)}</td><td class="n">${num(a.registros?.length)}</td><td>${a.modificado ? new Date(a.modificado).toLocaleDateString("pt-BR") : ""}</td><td>${esc(a.motivo || [a.info?.til_compartilhado ? `${num(a.info.til_compartilhado)} OS de Till compartilhado` : "", a.info?.fora_do_codigo ? `${num(a.info.fora_do_codigo)} linhas de outros códigos ignoradas` : ""].filter(Boolean).join(" · "))}</td></tr>`).join("") || '<tr><td colspan="6">Nenhum arquivo.</td></tr>'}</tbody></table></div></details>
   <details ${nc.length ? "open" : ""}><summary>Recursos · Engenharia × Serviços (${recs.length})</summary><div>
     <div class="card-h"><input class="busca" id="qRec" placeholder="Buscar recurso…" value="${esc(BUSCA_REC)}"><div class="dir"><button class="btn" data-all="eng">Filtrados → Engenharia</button><button class="btn" data-all="srv">Filtrados → Serviços</button><button class="btn" data-all="">Filtrados → sem grupo</button></div></div>
     <div class="tw"><table class="rec"><thead><tr><th>Recurso</th><th class="n">OS</th><th class="n">Exec.</th><th>Grupo</th></tr></thead><tbody id="tRec">${recs.map((r) => { const k = norm(r.n), v = SEL[k] || ""; return `<tr data-k="${esc(k)}"><td>${esc(r.n)}</td><td class="n">${num(r.q)}</td><td class="n">${num(r.e)}</td><td>${[["eng", "Engenharia"], ["srv", "Serviços"], ["", "Sem grupo"]].map(([val, l]) => `<label><input type="radio" name="g_${esc(k)}" value="${val}" ${v === val ? "checked" : ""}> ${l}</label>`).join("")}</td></tr>`; }).join("") || '<tr><td colspan="4">Conecte a pasta para listar os recursos.</td></tr>'}</tbody></table></div>
@@ -666,6 +672,7 @@ function abaDados() {
     <li><b>Efetividade</b> = executadas ÷ visitas. Abaixo da meta (${pct(RG().meta)}) fica em laranja.</li>
     <li><b>Equipes ativas</b> = recursos diferentes com pelo menos uma OS no período. O grupo (Engenharia/Serviços) vem da seleção em Recursos.</li>
     <li><b>Produtividade</b> = executadas ÷ equipes ativas (média de execuções por equipe no período).</li>
+    <li><b>Till compartilhado</b> = OS executadas (Finalizada) vindas de arquivo com "Til(l) Compartilhado" no nome, ou com COMPARTILHADO no Código/Descrição. Ficam numa coluna à parte, por recurso, e não entram em visitas, dias trabalhados nem efetividade. Respeitam os filtros de mês, data e cidade.</li>
     <li><b>Dias trabalhados</b> = dias diferentes (coluna Data) com pelo menos uma OS. Por equipe: dias daquela equipe. No total: soma dos dias de cada equipe (equipe-dia). <b>Exec./dia</b> = executadas ÷ dias trabalhados.</li>
     <li><b>Implantação</b> = toda OS executada (ou só as que têm o texto da regra 4, se preenchido).</li>
     <li>OS repetidas (mesmo ID da Atividade em mais de um arquivo) contam uma vez só.</li></ul></div></details>
