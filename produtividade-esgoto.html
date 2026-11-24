@@ -6,6 +6,7 @@
 <title>Produtividade Esgoto</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --navy:#102840;--blue:#176b9c;--cyan:#16a5b8;--ink:#1f2d3d;--muted:#64748b;--line:#dbe4ec;--bg:#f3f6f9;
@@ -129,7 +130,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v22</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v23</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -169,7 +170,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v22-20261124";
+const VERSAO_SITE = "v23-20261124";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -431,6 +432,48 @@ document.addEventListener("click", (e) => {
   ordena(t);
 });
 
+/* ================= PDF ================= */
+async function geraPDF(qual) {
+  if (!window.jspdf || !window.html2canvas) return toast("Não foi possível carregar o gerador de PDF (verifique a internet).", true);
+  const cards = [...document.querySelectorAll("#a-prod .duas > .card")];
+  const card = (g) => cards.find((c) => c.querySelector(`[data-pdf="${g}"]`));
+  const partes = qual === "todos" ? [$("kpisTopo"), $("a-prod").querySelector(".duas"), $("grafBox")?.closest(".card")] : [card(qual)];
+  if (partes.some((x) => x === undefined) || !partes[0]) return toast("Nada para exportar.", true);
+  toast("Gerando PDF…");
+  const nome = { todos: "Todos", eng: "Engenharia", srv: "Serviços" }[qual];
+  const box = document.createElement("div");
+  box.style.cssText = `position:fixed;left:-10000px;top:0;width:${qual === "todos" ? 1400 : 900}px;background:#f3f6f9;padding:16px;font-family:'IBM Plex Sans',Arial,sans-serif`;
+  box.innerHTML = `<div style="background:linear-gradient(135deg,#0b2447 0%,#14375e 60%,#1b4a76 100%);color:#fff;padding:14px 16px;border-radius:8px;margin-bottom:14px">
+    <div style="color:#9fe1e7;font-size:11px;letter-spacing:.1em;font-weight:600">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO</div>
+    <div style="font-size:20px;font-weight:700;margin-top:4px">${esc($("titulo").textContent)} · ${nome}</div>
+    <div style="color:#bfe0eb;font-size:12px">${esc(filtrosTexto())} · gerado em ${new Date().toLocaleString("pt-BR")}</div></div>`;
+  for (const p of partes.filter(Boolean)) { const c = p.cloneNode(true); c.querySelectorAll("button,.help,input,#grafTip").forEach((x) => x.remove()); c.querySelectorAll(".tw").forEach((x) => { x.style.maxHeight = "none"; x.style.overflow = "visible"; }); c.style.marginBottom = "14px"; box.appendChild(c); }
+  document.body.appendChild(box);
+  try {
+    const cv = await html2canvas(box, { scale: 2, backgroundColor: "#f3f6f9" });
+    const { jsPDF } = window.jspdf, pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297 - 16, H = 210 - 16, ratio = W / cv.width, alturaPag = Math.floor(H / ratio);
+    for (let y = 0, pg = 0; y < cv.height; y += alturaPag, pg++) {
+      const fatia = document.createElement("canvas"); fatia.width = cv.width; fatia.height = Math.min(alturaPag, cv.height - y);
+      fatia.getContext("2d").drawImage(cv, 0, y, cv.width, fatia.height, 0, 0, cv.width, fatia.height);
+      if (pg) pdf.addPage();
+      pdf.addImage(fatia.toDataURL("image/jpeg", 0.92), "JPEG", 8, 8, W, fatia.height * ratio);
+    }
+    pdf.save(`painel_esgoto_${nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast("PDF gerado.");
+  } catch (e) { console.error(e); toast("Erro ao gerar o PDF: " + e.message, true); }
+  finally { box.remove(); }
+}
+function filtrosTexto() {
+  const f = [];
+  if (F.mes.size) f.push("Mês: " + [...F.mes].sort().map(mesLongo).join(", "));
+  if (F.dia.size) f.push("Data: " + [...F.dia].sort().map(dataBR).join(", "));
+  if (F.cid.size) f.push("Cidade: " + [...F.cid].join(", "));
+  if (F.tipo.size) f.push("Tipo: " + [...F.tipo].map((t) => CLS()[t] || t).join(", "));
+  return f.length ? f.join(" · ") : "Todo o período";
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-pdf]"); if (b) geraPDF(b.dataset.pdf); });
+
 /* ================= cálculos ================= */
 function porGrupo(L, TC = []) {
   const G = {};
@@ -492,7 +535,7 @@ function abaProd() {
   const L = osFiltradas(), TC = tcFiltrados(), G = porGrupo(L, TC), meta = RG().meta;
   const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo, Object.values(G).flatMap((g) => g.tc));
   const eq = (g) => G[g] ? [...G[g].rec.values()].filter((x) => x.L.length || x.tc.length).length : 0;
-  let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Till compartilhado", num(T.tc), "executadas")}${kpi("Efetividade", pct(T.prod), "(exec. + till) ÷ (visitas + till) · meta " + pct(meta), (T.vis + T.tc) && T.prod < meta)}</div>`;
+  let h = `<div class="card-h" style="margin-bottom:8px"><div class="dir"><button class="btn pri" data-pdf="todos">⬇ PDF Todos</button><button class="btn" data-pdf="eng">⬇ PDF Engenharia</button><button class="btn" data-pdf="srv">⬇ PDF Serviços</button></div></div><div class="kpis" id="kpisTopo">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Till compartilhado", num(T.tc), "executadas")}${kpi("Efetividade", pct(T.prod), "(exec. + till) ÷ (visitas + till) · meta " + pct(meta), (T.vis + T.tc) && T.prod < meta)}</div>`;
   const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
   h += `<div class="duas">${cards.join("")}</div>`;
   h += cardGrafMes(L, TC.filter((r) => F.nc || grupo(r.r) !== "nc"));
@@ -500,7 +543,7 @@ function abaProd() {
 }
 function cardGrupo(g, o) {
   const meta = RG().meta;
-  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Efetividade = (executadas + till compartilhado) ÷ (visitas + till compartilhado). Implantação = OS executada (regra 4 em Dados → Regras). Till comp. = OS executadas (Finalizada) do arquivo de Till Compartilhado (ou com COMPARTILHADO no Código/Descrição); entram na efetividade como visita executada. Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
+  const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Efetividade = (executadas + till compartilhado) ÷ (visitas + till compartilhado). Implantação = OS executada (regra 4 em Dados → Regras). Till comp. = OS executadas (Finalizada) do arquivo de Till Compartilhado (ou com COMPARTILHADO no Código/Descrição); entram na efetividade como visita executada. Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button><button class="btn" data-pdf="${g}">⬇ PDF</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
   const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L, x.tc) })).sort((a, b) => b.R.ex - a.R.ex || b.tc.length - a.tc.length), ativos = recs.filter((x) => x.L.length || x.tc.length).length;
   const T = resumo(o.L, o.tc);
