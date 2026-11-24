@@ -129,7 +129,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v19</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v20</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -169,7 +169,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v19-20261124";
+const VERSAO_SITE = "v20-20261124";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -479,6 +479,11 @@ function diagProd() {
   else if (!filt.length) av.push("Os filtros selecionados (Mês, Data, Cidade ou Tipo) não deixaram nenhuma visita. Clique em Limpar filtros.");
   else if (!F.nc && !filt.some((r) => grupo(r.r) !== "nc")) av.push(`Nenhum recurso está marcado como Engenharia ou Serviços (${new Set(filt.map((r) => r.r)).size} recursos sem grupo). Marque em Dados → Recursos, ou ligue “Mostrar recursos não classificados”.`);
   else { const nc = new Set(filt.filter((r) => grupo(r.r) === "nc").map((r) => r.r)).size; if (nc && !F.nc) av.push(`${nc} recurso(s) sem grupo não aparecem nas contas. Marque em Dados → Recursos.`); }
+  const TCall = D.tc || [], TCe = TCall.filter((r) => r.e), TCf = tcFiltrados();
+  if (!TCall.length) av.push('Till compartilhado: nenhum arquivo reconhecido. O nome do arquivo precisa ter "Till Compartilhado" (ou "Til Compartilhado"), ou o Código/Descrição precisa ter COMPARTILHADO. Veja em Dados → Bases carregadas.');
+  else if (!TCe.length) av.push(`Till compartilhado: ${TCall.length} OS lidas, mas nenhuma com status de executada (${RG().status.join(", ")}). Status no arquivo: ${[...new Set(TCall.map((r) => r.s))].join(", ")}. Ajuste em Dados → Regras (item 2).`);
+  else if (TCf.length && !F.nc) { const sem = [...new Set(TCf.filter((r) => grupo(r.r) === "nc").map((r) => r.r))]; if (sem.length) av.push(`Till compartilhado: ${sem.length} equipe(s) sem grupo — ${sem.slice(0, 8).join(", ")}${sem.length > 8 ? "…" : ""}. Marque em Dados → Recursos.`); }
+  else if (TCe.length && !TCf.length) av.push(`Till compartilhado: ${TCe.length} OS executadas, mas nenhuma dentro dos filtros (Mês/Data/Cidade).`);
   return av.map((a) => `<div class="card" style="background:#ffedd5;border-color:#f59e0b;color:#9a3412;padding:10px 14px">⚠ ${esc(a)}</div>`).join("");
 }
 function kpi(rot, val, sub = "", alerta = false) { return `<div class="kpi ${alerta ? "alerta" : ""}"><span>${rot}</span><b class="${alerta ? "low" : ""}">${val}</b>${sub ? `<small>${sub}</small>` : ""}</div>`; }
@@ -486,7 +491,7 @@ function kpi(rot, val, sub = "", alerta = false) { return `<div class="kpi ${ale
 function abaProd() {
   const L = osFiltradas(), TC = tcFiltrados(), G = porGrupo(L, TC), meta = RG().meta;
   const tudo = Object.values(G).flatMap((g) => g.L), T = resumo(tudo);
-  const eq = (g) => G[g] ? [...G[g].rec.values()].length : 0;
+  const eq = (g) => G[g] ? [...G[g].rec.values()].filter((x) => x.L.length || x.tc.length).length : 0;
   let h = `<div class="kpis">${kpi("Equipes · Engenharia", num(eq("eng")))}${kpi("Equipes · Serviços", num(eq("srv")))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Visitas", num(T.vis))}${kpi("Executadas", num(T.ex), RG().status.join(" + "))}${kpi("Efetividade", pct(T.prod), "meta " + pct(meta), T.vis && T.prod < meta)}${kpi("Till compartilhado", num(TC.filter((r) => F.nc || grupo(r.r) !== "nc").length), "executadas")}${kpi("Implantações", num(T.im), RG().impl ? "com " + RG().impl : "toda OS executada")}</div>`;
   const cards = ["eng", "srv", ...(F.nc ? ["nc"] : [])].map((g) => cardGrupo(g, G[g]));
   h += `<div class="duas">${cards.join("")}</div>`;
@@ -497,7 +502,7 @@ function cardGrupo(g, o) {
   const meta = RG().meta;
   const tit = `<div class="card-h"><h2>${GN[g]}</h2>${help("Visitas = todas as OS de SONDAGEM DE REDE DE ESGOTO do período. Executadas = status Finalizada (Encerrada com Ocorrência conta só como visita). Efetividade = executadas ÷ visitas. Implantação = OS executada (regra 4 em Dados → Regras). Till comp. = OS executadas (Finalizada) do arquivo de Till Compartilhado (ou com COMPARTILHADO no Código/Descrição); não entram em visitas nem na efetividade. Dias trab. = dias diferentes (coluna Data) em que a equipe teve pelo menos uma OS no período; no Total é a soma dos dias de cada equipe (equipe-dia). Exec./dia = executadas ÷ dias trabalhados. Clique num número para ver os clientes.")}<div class="dir"><button class="btn" data-csvg="${g}">⬇ CSV</button></div></div>`;
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
-  const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex || b.tc.length - a.tc.length), ativos = recs.filter((x) => x.L.length).length;
+  const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L) })).sort((a, b) => b.R.ex - a.R.ex || b.tc.length - a.tc.length), ativos = recs.filter((x) => x.L.length || x.tc.length).length;
   const T = resumo(o.L);
   const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td>${lk(R.im, `${nome} · implantações`, () => R.imL.map(linhaOS))}${(() => { const T2 = tot ? o.tc : o.rec.get(nome).tc; return lk(T2.length, `${nome} · till compartilhado`, () => T2.map(linhaOS)); })()}</tr>`;
   return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(ativos))}${kpi("Efetividade", pct(T.prod), "", T.prod < meta)}${kpi("Produtividade", num(T.ex / ativos))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}${kpi("Till compartilhado", num(o.tc.length))}</div>
@@ -617,7 +622,7 @@ function csvOS() { baixaCSV("painel_esgoto_os_cruzadas.csv", ["Recurso", "Grupo"
 
 /* ================= aba Dados ================= */
 let BUSCA_REC = "";
-function recursos() { const m = new Map(); if (D) for (const r of [...D.os, ...(D.tc || [])]) { if (!r.r || !r.v) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
+function recursos() { const m = new Map(); if (D) for (const r of [...D.os, ...(D.tc || [])]) { if (!r.r || (!r.v && !r.tc)) continue; const o = m.get(r.r) || { n: r.r, q: 0, e: 0 }; o.q++; if (r.e) o.e++; m.set(r.r, o); } return [...m.values()].sort((a, b) => b.q - a.q || a.n.localeCompare(b.n)); }
 function reporte() {
   if (!D || !D.os.length) return `<div class="reporte"><h3>Reporte semanal</h3><div class="sub">Sem dados.</div></div>`;
   // período: o filtrado (Data/Mês) ou os últimos 7 dias até a data mais recente COM VISITA (nunca depois de hoje)
