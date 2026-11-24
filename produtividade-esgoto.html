@@ -129,7 +129,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <header class="topo">
   <div class="l1">
     <div class="tit">
-      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v21</span></div>
+      <div class="selo">ÁGUAS DO RIO • RELATÓRIO EXECUTIVO <span class="versao" id="selo">v22</span></div>
       <h1 id="titulo">Produtividade · Execução de Esgoto</h1>
       <div class="status" id="status">Conecte a pasta com as planilhas.</div>
     </div>
@@ -169,7 +169,7 @@ ul.av{margin:0;padding-left:18px}ul.av li{margin:4px 0}
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSAO_SITE = "v21-20261124";
+const VERSAO_SITE = "v22-20261124";
 const BASE = "b1";                       // aumente quando mudar o código de leitura (invalida o cache)
 const EXT = /\.(xlsx|xlsm|xls|csv)$/i;
 document.getElementById("selo").textContent = VERSAO_SITE.split("-")[0];
@@ -504,9 +504,9 @@ function cardGrupo(g, o) {
   if (!o) return `<div class="card">${tit}<div class="vazio" style="padding:20px">${g === "nc" ? "Nenhum recurso sem grupo." : "Nenhum recurso marcado como " + GN[g] + ". Marque na aba Dados → Recursos."}</div></div>`;
   const recs = [...o.rec.values()].map((x) => ({ ...x, R: resumo(x.L, x.tc) })).sort((a, b) => b.R.ex - a.R.ex || b.tc.length - a.tc.length), ativos = recs.filter((x) => x.L.length || x.tc.length).length;
   const T = resumo(o.L, o.tc);
-  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}${lk(R.tc, `${nome} · till compartilhado`, () => R.tcL.map(linhaOS))}<td class="n" title="${tot ? "Soma dos dias de cada equipe" : ""}">${num(tot ? R.eqDias : R.dias)}</td><td class="n">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td></tr>`;
+  const lin = (nome, R, tot) => `<tr class="${tot ? "tot" : ""}"><td>${esc(nome)}</td>${lk(R.vis, `${nome} · visitas`, () => (tot ? o.L : o.rec.get(nome).L).map(linhaOS))}${lk(R.ex, `${nome} · executadas`, () => R.exL.map(linhaOS))}${lk(R.tc, `${nome} · till compartilhado`, () => R.tcL.map(linhaOS))}<td class="n" title="${num(tot ? R.eqDias : R.dias)} ${tot ? "equipe-dia" : "dia(s) trabalhado(s)"}">${num(R.ex / (tot ? R.eqDias : R.dias))}</td><td class="n ${R.prod < meta ? "low" : ""}">${pct(R.prod)}</td><td><div class="bar ${R.prod < meta ? "alerta" : ""}"><i style="width:${Math.min(100, R.prod * 100)}%"></i></div></td></tr>`;
   return `<div class="card">${tit}<div class="kpis" style="margin-bottom:10px">${kpi("Equipes ativas", num(ativos))}${kpi("Efetividade", pct(T.prod), "(exec. + till) ÷ (visitas + till)", T.prod < meta)}${kpi("Produtividade", num(T.ex / ativos))}${kpi("Dias trabalhados", num(T.dias), num(T.eqDias) + " equipe-dia")}${kpi("Exec./equipe-dia", num(T.ex / T.eqDias))}${kpi("Till compartilhado", num(T.tc))}</div>
-  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n" title="Till compartilhado">Till comp.</th><th class="n">Dias trab.</th><th class="n">Exec./dia</th><th class="n" title="(Exec. + Till) ÷ (Visitas + Till)">Efet.</th><th></th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
+  <div class="tw"><table><thead><tr><th>Recurso</th><th class="n">Visitas</th><th class="n">Exec.</th><th class="n" title="Till compartilhado">Till comp.</th><th class="n" title="Executadas ÷ dias trabalhados">Exec./dia</th><th class="n" title="(Exec. + Till) ÷ (Visitas + Till)">Efet.</th><th></th></tr></thead><tbody>${recs.map((x) => lin(x.nome, x.R)).join("")}${lin("Total", T, true)}</tbody></table></div></div>`;
 }
 let GRAF = "mes";                                   // "mes" | "dia"
 const SEM = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
